@@ -1,0 +1,15 @@
+- [x] History
+- [x] Redemption History
+- [x] Home
+- [x] CouponScan
+- [x] SideMenu
+- [x] RedemptionPage
+- [x] AlertStatic
+- [x] AlertComp
+- [x] PayoutRequest
+- [x] UPI
+- [x] NEFT
+- [x] UPdateNow
+- [x] WelcomePoints
+- [x] Login
+- [x] SignUp

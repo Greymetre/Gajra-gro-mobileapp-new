@@ -1,0 +1,33 @@
+const axios = require('axios');
+const FormData = require('form-data');
+const fs = require('fs');
+let data = new FormData();
+data.append('firmName', 'Greymetre Pvt .Ltd');
+data.append('contactPerson', 'Asit Shrivastav');
+data.append('mobile', '9131862364');
+data.append('email', 'ajay29@gmail.com');
+data.append('customerType', 'Distributor');
+data.append('avatar', fs.createReadStream('/Users/apple/Downloads/IMG_20190208_180041.jpg'));
+data.append('shopimage', fs.createReadStream('/Users/apple/Downloads/WhatsApp Image 2023-05-22 at 10.05.44 PM.jpeg'));
+data.append('address[state]', 'MP');
+data.append('address[city]', 'Indore');
+data.append('address[postalCode]', '452001');
+data.append('address[address]', 'indore');
+let config = {
+  method: 'post',
+  maxBodyLength: Infinity,
+  url: 'http://localhost:4000/api/loyalty/auth/updatePersonalInfo',
+  headers: { 
+    'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI2NDdmM2FiYTY1OTkxOTdhMDNiMzRlODUiLCJmaXJtTmFtZSI6IlRlc3QgU2lsdmVyIiwiY29udGFjdFBlcnNvbiI6IlRlc3QgU2lsdmVyIiwibW9iaWxlIjoiOTMwMzE0MjA0NiIsImN1c3RvbWVyVHlwZSI6Ik1lY2hhbmljIiwibG9naW5BdCI6IjIwMjMtMDYtMDZUMTM6NTU6MDYuNDM0WiIsImlhdCI6MTY4NjA1OTc1MiwiZXhwIjoxNzE3NTk1NzUyfQ.PWLSjDp-ZVU46HS_yTEuNBcA5BDSchmlcpInQh5LlZs', 
+    ...data.getHeaders()
+  },
+  data : data
+};
+
+axios.request(config)
+.then((response) => {
+  console.log(JSON.stringify(response.data));
+})
+.catch((error) => {
+  console.log(error);
+});

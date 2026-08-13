@@ -1,0 +1,34 @@
+[
+  [
+    "aadharimage",
+    {
+      "name": "Aadhar Front",
+      "type": "image/png",
+      "uri": "file:///storage/emulated/0/Download/rn_image_picker_lib_temp_54ae2037-65f1-443e-9a25-8c8cfc5d7a17.png"
+    }
+  ],
+  [
+    "gstinimage",
+    {
+      "name": "Aadhar Front",
+      "type": "image/png",
+      "uri": "file:///storage/emulated/0/Download/rn_image_picker_lib_temp_54ae2037-65f1-443e-9a25-8c8cfc5d7a17.png"
+    }
+  ],
+  [
+    "otherimage",
+    {
+      "name": "Aadhar Front",
+      "type": "image/png",
+      "uri": "file:///storage/emulated/0/Download/rn_image_picker_lib_temp_54ae2037-65f1-443e-9a25-8c8cfc5d7a17.png"
+    }
+  ],
+  [
+    "panimage",
+    {
+      "name": "Aadhar Front",
+      "type": "image/png",
+      "uri": "file:///storage/emulated/0/Download/rn_image_picker_lib_temp_54ae2037-65f1-443e-9a25-8c8cfc5d7a17.png"
+    }
+  ]
+]

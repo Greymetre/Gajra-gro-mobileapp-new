@@ -1,0 +1,55 @@
+rootProject.name = 'GajraGearsMLP'
+apply from: file("../node_modules/@react-native-community/cli-platform-android/native_modules.gradle"); applyNativeModulesSettingsGradle(settings)
+//  apply from: file("../../../node_modules/@react-native-community/cli-platform-android/native_modules.gradle"); applyNativeModulesSettingsGradle(settings)
+
+include ':app'
+includeBuild('../node_modules/@react-native/gradle-plugin')
+// include ':react-native-linear-gradient'
+// include ':react-native-vector-icons'
+
+// if (settings.hasProperty("newArchEnabled") && settings.newArchEnabled == "true") {
+//     include(":ReactAndroid")
+//     project(":ReactAndroid").projectDir = file('../node_modules/react-native/ReactAndroid')
+//     include(":ReactAndroid:hermes-engine")
+//     project(":ReactAndroid:hermes-engine").projectDir = file('../node_modules/react-native/ReactAndroid/hermes-engine')
+//     project(':react-native-linear-gradient').projectDir = new File(rootProject.projectDir, '../node_modules/react-native-linear-gradient/android')
+//     project(':react-native-vector-icons').projectDir = new File(rootProject.projectDir, '../node_modules/react-native-vector-icons/android')
+//     include(':react-native-fs')
+//     project(':react-native-fs').projectDir = new File(settingsDir, '../node_modules/react-native-fs/android')
+//     include(':react-native-version-check')
+// project(':react-native-version-check').projectDir = new File(rootProject.projectDir, 	'../node_modules/react-native-version-check/android')
+
+// }
+
+
+// rootProject.name = 'GajraGearsMLP'
+
+// include ':app'
+
+// // Required for RN 0.74+
+// includeBuild('../node_modules/@react-native/gradle-plugin')
+
+// // Loads native modules — must come last
+// apply from: file("../node_modules/@react-native-community/cli-platform-android/native_modules.gradle")
+// applyNativeModulesSettingsGradle(settings)
+
+
+
+// Force Gradle to use the right Node binary
+// ext {
+//     nodeExecutableAndArgs = ["/Users/mac-202/.nvm/versions/node/v21.5.0/bin/node"]   // <-- replace if your path is different
+// }
+
+// rootProject.name = 'GajraGearsMLP'
+
+// // 👇 Add this so Gradle knows exactly where Node is
+// def nodeBinary = System.getenv("NODE_BINARY") ?: "/Users/mac-202/.nvm/versions/node/v21.5.0/bin/node"
+// System.setProperty("node.path", nodeBinary)
+
+// apply from: file("../node_modules/@react-native-community/cli-platform-android/native_modules.gradle")
+// applyNativeModulesSettingsGradle(settings)
+
+// include ':app'
+
+// // Required for RN 0.74+
+// includeBuild('../node_modules/@react-native/gradle-plugin')
