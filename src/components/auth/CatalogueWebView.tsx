@@ -6,6 +6,7 @@ import {
     Platform,
     StatusBar,
     BackHandler,
+    PermissionsAndroid,
 } from 'react-native';
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -38,6 +39,22 @@ const CatalogueWebView = ({ navigation, route }: any) => {
             });
         }, [navigation, route])
     );
+
+    // The locator pages call navigator.geolocation for "Nearby Search".
+    // On Android the WebView only gets a fix once the app itself holds the
+    // runtime location permission, so ask for it before the page needs it.
+    useEffect(() => {
+
+        if (Platform.OS !== 'android') {
+            return;
+        }
+
+        PermissionsAndroid.requestMultiple([
+            PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+            PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION,
+        ]).catch(() => { });
+
+    }, []);
 
     const backAction = () => {
 
@@ -133,6 +150,9 @@ const CatalogueWebView = ({ navigation, route }: any) => {
 
                 javaScriptEnabled
                 domStorageEnabled
+
+                // Required for navigator.geolocation inside the WebView (Android)
+                geolocationEnabled
 
                 allowsInlineMediaPlayback
                 mediaPlaybackRequiresUserAction={false}

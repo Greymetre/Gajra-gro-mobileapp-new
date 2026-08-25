@@ -76,7 +76,6 @@
     "redux-thunk": "^2.4.2",
     "styled-components": "^5.3.11",
     "toggle-switch-react-native": "^3.3.0",
-    "vision-camera-barcode-scanner": "^0.2.2",
     "yup": "^1.2.0"
   },
   "devDependencies": {

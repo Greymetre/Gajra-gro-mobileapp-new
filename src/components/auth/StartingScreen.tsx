@@ -5,6 +5,9 @@ import LinearGradient from 'react-native-linear-gradient';
 import FontFamily from '../../constants/fontFamily';
 import navigationStrings from '../../constants/navigationStrings';
 
+// Locator pages are served by the Railway-hosted landing site.
+const LOCATOR_BASE_URL = 'https://gajragrolandingwebsite-production.up.railway.app';
+
 
 const StartingScreen = ({ navigation }: any) => {
   return (
@@ -38,7 +41,7 @@ const StartingScreen = ({ navigation }: any) => {
                 <Image source={require('../../../assets/images/catalog.png')} style={{ height: 90, width: 90, position: 'absolute', left: 0 }} resizeMode='contain' />
               </Pressable>
               <Pressable style={[styles.item, styles.row, { justifyContent: "flex-end", marginTop: 29 }]} onPress={()=>{
-                navigation.navigate('CatalogueWebViewScreen', {url: "https://gajragrolandingwebsite-production.up.railway.app/", title: "Distributor/Retailer Locator"})
+                navigation.navigate('CatalogueWebViewScreen', {url: `${LOCATOR_BASE_URL}/customer-details/Retailer?status=true`, title: "Distributor/Retailer Locator"})
               }}>
                 <View style={[{ width: '85%', borderWidth: 1, borderColor: 'rgba(0, 0, 0, 0.1)', height: 90, alignSelf: 'flex-end', borderRadius: 30 }, styles.center]}>
                   <Text style={[styles.mainHeading, { color: '#0F172A' }]}>Distributor/{'\n'}Retailer Locator</Text>
@@ -46,7 +49,7 @@ const StartingScreen = ({ navigation }: any) => {
                 <Image source={require('../../../assets/images/locator.png')} style={{ height: 90, width: 90, position: 'absolute', left: 0 }} resizeMode='contain' />
               </Pressable>
               <Pressable style={[styles.item, styles.row, { justifyContent: "flex-end", marginTop: 29 }]} onPress={()=>{
-                navigation.navigate('CatalogueWebViewScreen', {url: "https://gajra.greyninja.in/customer-details/Mechanic?mechanic=true", title: "Mechanic / Fleet / Owner Locator"})
+                navigation.navigate('CatalogueWebViewScreen', {url: `${LOCATOR_BASE_URL}/customer-details/Mechanic?mechanicStatus=true`, title: "Mechanic / Fleet / Owner Locator"})
               }}>
                 <View style={[{ width: '85%', borderWidth: 1, borderColor: 'rgba(0, 0, 0, 0.1)', height: 90, alignSelf: 'flex-end', borderRadius: 30 }, styles.center]}>
                   <Text style={[styles.mainHeading, { color: '#0F172A' }]}>Mechanic / Fleet /{'\n'}Owner Locator</Text>
