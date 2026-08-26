@@ -130,5 +130,22 @@
   "Mode": "Mode",
   "Bank_name": "Bank Name",
   "Account_number": "Account Number",
-  "IFSC_Code": "IFSA Code"
+  "IFSC_Code": "IFSA Code",
+  "updatelocation": "Update Location",
+  "updatelocationhint": "Stand at your shop and detect your location so we can map you correctly.",
+  "savedlocation": "SAVED LOCATION",
+  "savedlocationcaption": "Location saved on your account",
+  "locationnotset": "Not set yet",
+  "currentlocation": "CURRENT LOCATION",
+  "latitude": "Latitude",
+  "longitude": "Longitude",
+  "accuracy": "Accuracy",
+  "detectlocation": "Detect my location",
+  "detectagain": "Detect again",
+  "detectinglocation": "Detecting your location",
+  "locationcaptured": "Location captured",
+  "locationnotdetected": "Location not detected",
+  "updatelocationfooter": "Your coordinates are used only to map your shop.",
+  "locationupdated": "Your location has been updated.",
+  "locationupdatefailed": "Could not update your location. Please try again."
 }

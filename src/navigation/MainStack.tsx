@@ -18,6 +18,7 @@ import ImageUpload from '../components/imageUpload/ImageUpload';
 import Profile from '../components/bottomtabs/profile/Profile';
 import Damage from '../components/coupon_scan/Damange';
 import CatalogueWebView from '../components/auth/CatalogueWebView';
+import UpdateLocation from '../components/UpdateLocation/UpdateLocation';
 export default function (Stack: any) {
   return (
     <>
@@ -30,6 +31,11 @@ export default function (Stack: any) {
         name="Location"
         options={{headerShown: false}}
         component={Location}
+      />
+      <Stack.Screen
+        name={navigationStrings.UPDATE_LOCATION}
+        options={{headerShown: false}}
+        component={UpdateLocation}
       />
       <Stack.Screen
         name={navigationStrings.REDEMPTIONFINAL}

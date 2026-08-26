@@ -61,6 +61,15 @@ import navigationStrings from '../../../../constants/navigationStrings';
 import { useTranslation } from 'react-i18next';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import CustomerTypeDropDowm from '../../../comman/Address/CustomerTypeDropDowm';
+import {
+  requestLocationPermission,
+  getCurrentCoordinates,
+  toGeoJsonCoordinates,
+  alertLocationPermissionDenied,
+  alertLocationPermissionBlocked,
+  alertLocationUnavailable,
+} from '../../../../utils/locationHelper';
+import type {UserCoordinates} from '../../../../utils/locationHelper';
 
 export interface CreateUserInterface {
   readonly firmName?: string;
@@ -85,6 +94,53 @@ const SignUpOne = (props: any) => {
   const [shopImg, setShopImg] = React.useState<any>(null);
   const [avatarImg, setAvatarImg] = React.useState<any>(null);
   const [custType, setCustType] = useState<string>();
+  const [coords, setCoords] = useState<UserCoordinates | null>(null);
+
+  /**
+   * Asks for the permission when needed, then reads the position.
+   * `showPopup` is off for the silent warm-up on mount and on for the submit
+   * attempt, where the user has to be told why we are blocking them.
+   */
+  const ensureLocation = async (
+    showPopup: boolean = true,
+  ): Promise<UserCoordinates | null> => {
+    const status = await requestLocationPermission();
+
+    if (status === 'blocked') {
+      if (showPopup) {
+        alertLocationPermissionBlocked();
+      }
+      return null;
+    }
+
+    if (status === 'denied') {
+      if (showPopup) {
+        alertLocationPermissionDenied(() => {
+          ensureLocation();
+        });
+      }
+      return null;
+    }
+
+    const position = await getCurrentCoordinates();
+    if (!position) {
+      if (showPopup) {
+        alertLocationUnavailable(() => {
+          ensureLocation();
+        });
+      }
+      return null;
+    }
+
+    setCoords(position);
+    return position;
+  };
+
+  // Warm up the GPS fix while the user is still filling the form so the
+  // coordinates are ready by the time they press submit.
+  useEffect(() => {
+    ensureLocation(false);
+  }, []);
   // const [country, setCountry] =
 
   const handleInputChange = (name: string, value: string) => {
@@ -180,6 +236,12 @@ const SignUpOne = (props: any) => {
     let fcmToken = await AsyncStorage.getItem('fcmToken')
     console.log('Button Pressed');
     // formik.setFieldValue("isClicked", true);
+    // The mount effect usually has the fix ready; retry here (with the popups
+    // enabled) when the permission was refused or the first attempt timed out.
+    const position = coords ?? (await ensureLocation());
+    if (!position) {
+      return;
+    }
     var data = {
       firmName: formik.values.firmName,
       contactPerson: formik.values.contactPerson,
@@ -198,6 +260,8 @@ const SignUpOne = (props: any) => {
         city: formik.values.address.city,
         state: formik.values.address.state,
         country: 'India',
+        // GeoJSON order: [longitude, latitude]
+        coordinates: toGeoJsonCoordinates(position),
       },
     };
     console.log('Button Pressed++++++',data);
@@ -264,6 +328,7 @@ const SignUpOne = (props: any) => {
   useEffect(() => {
     mobileCall({});
   }, []);
+
   // useEffect(() => {
   //   const backAction = () => {
   //     if (visibleLocation) {

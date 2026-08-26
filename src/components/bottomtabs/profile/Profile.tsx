@@ -53,6 +53,7 @@ import {
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import Feather from 'react-native-vector-icons/Feather';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import FontAwesome from 'react-native-vector-icons/FontAwesome';
 import { useTranslation } from 'react-i18next';
 import appTheme, { screenWidth } from '../../../utils/appTheme';
@@ -1140,6 +1141,39 @@ const Profile = (props: any) => {
               </TouchableOpacity> */}
               </View>
             </View>
+            <BRNE
+              title={`${t('updatelocation')}`}
+              color={appTheme.NEW_PALLET}
+              type="solid"
+              onPress={() =>
+                navigation.navigate(navigationStrings.UPDATE_LOCATION)
+              }
+              icon={
+                <MaterialCommunityIcons
+                  name="map-marker-radius"
+                  color="black"
+                  size={18}
+                  style={{ paddingRight: 6 }}
+                />
+              }
+              iconPosition="left"
+              buttonStyle={{
+                backgroundColor: appTheme.NEW_PALLET,
+                borderRadius: 8,
+                paddingVertical: 8,
+                paddingHorizontal: 14,
+              }}
+              titleStyle={{
+                color: 'black',
+                fontSize: responsiveFontSize(1.6),
+              }}
+              titleProps={{ numberOfLines: 1 }}
+              containerStyle={{
+                alignSelf: 'flex-end',
+                marginTop: responsiveHeight(1.5),
+                marginHorizontal: responsiveWidth(4),
+              }}
+            />
             <View
               style={{
                 marginTop: responsiveHeight(3),

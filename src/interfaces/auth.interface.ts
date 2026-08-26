@@ -20,6 +20,7 @@ export interface AuthLocationInterface {
     city?: string;
     state?: string;
     country?: string;
+    coordinates?: [number, number];
 }
 
 export interface ViewAuthInfoInterface {

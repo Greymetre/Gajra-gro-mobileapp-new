@@ -130,5 +130,22 @@
   "Mode": "मोड",
   "Bank_name": "बैंक का नाम",
   "Account_number": "खाता संख्या",
-  "IFSC_Code": "IFSA कोड"
+  "IFSC_Code": "IFSA कोड",
+  "updatelocation": "लोकेशन अपडेट करें",
+  "updatelocationhint": "अपनी दुकान पर खड़े होकर लोकेशन डिटेक्ट करें ताकि हम आपको सही जगह मैप कर सकें।",
+  "savedlocation": "सेव की गई लोकेशन",
+  "savedlocationcaption": "आपके अकाउंट में सेव लोकेशन",
+  "locationnotset": "अभी सेट नहीं है",
+  "currentlocation": "मौजूदा लोकेशन",
+  "latitude": "अक्षांश",
+  "longitude": "देशांतर",
+  "accuracy": "सटीकता",
+  "detectlocation": "मेरी लोकेशन डिटेक्ट करें",
+  "detectagain": "दोबारा डिटेक्ट करें",
+  "detectinglocation": "आपकी लोकेशन ढूंढी जा रही है",
+  "locationcaptured": "लोकेशन मिल गई",
+  "locationnotdetected": "लोकेशन नहीं मिली",
+  "updatelocationfooter": "आपके कोऑर्डिनेट्स सिर्फ दुकान मैप करने के लिए इस्तेमाल होते हैं।",
+  "locationupdated": "आपकी लोकेशन अपडेट हो गई है।",
+  "locationupdatefailed": "लोकेशन अपडेट नहीं हो सकी। कृपया दोबारा कोशिश करें।"
 }

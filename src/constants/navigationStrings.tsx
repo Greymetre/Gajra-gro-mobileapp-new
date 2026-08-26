@@ -3,6 +3,7 @@ const navigationStrings = {
   STARTINGSCREEN: 'StartingScreen',
   HOME: 'Home',
   LOCATION: 'Location',
+  UPDATE_LOCATION: 'UpdateLocation',
   SIGN_UP_ONE: 'SignUpOne',
   SIGN_UP_TWO: 'SignUpTwo',
   SIGN_UP_THREE: 'SignUpThree',

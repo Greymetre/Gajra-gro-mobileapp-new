@@ -4,4 +4,5 @@ export interface UserAddressInterface {
     city?: string;
     state?: string;
     country?: string;
+    coordinates?: [number, number];
 }

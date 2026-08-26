@@ -130,5 +130,22 @@
   "Mode": "মোড",
   "Bank_name": "ব্যাংকের নাম",
   "Account_number": "অ্যাকাউন্ট নম্বর",
-  "IFSC_Code": "আইএফএসসি কোড"
+  "IFSC_Code": "আইএফএসসি কোড",
+  "updatelocation": "লোকেশন আপডেট করুন",
+  "updatelocationhint": "আপনার দোকানে দাঁড়িয়ে লোকেশন সনাক্ত করুন যাতে আমরা সঠিকভাবে ম্যাপ করতে পারি।",
+  "savedlocation": "সংরক্ষিত লোকেশন",
+  "savedlocationcaption": "আপনার অ্যাকাউন্টে সংরক্ষিত লোকেশন",
+  "locationnotset": "এখনও সেট করা হয়নি",
+  "currentlocation": "বর্তমান লোকেশন",
+  "latitude": "অক্ষাংশ",
+  "longitude": "দ্রাঘিমাংশ",
+  "accuracy": "নির্ভুলতা",
+  "detectlocation": "আমার লোকেশন সনাক্ত করুন",
+  "detectagain": "আবার সনাক্ত করুন",
+  "detectinglocation": "আপনার লোকেশন খোঁজা হচ্ছে",
+  "locationcaptured": "লোকেশন পাওয়া গেছে",
+  "locationnotdetected": "লোকেশন পাওয়া যায়নি",
+  "updatelocationfooter": "আপনার কোঅর্ডিনেট শুধু দোকান ম্যাপ করতে ব্যবহার হয়।",
+  "locationupdated": "আপনার লোকেশন আপডেট হয়েছে।",
+  "locationupdatefailed": "লোকেশন আপডেট করা যায়নি। আবার চেষ্টা করুন।"
 }

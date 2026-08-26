@@ -3212,6 +3212,16 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@react-native-community/geolocation@npm:^3.4.0":
+  version: 3.4.0
+  resolution: "@react-native-community/geolocation@npm:3.4.0"
+  peerDependencies:
+    react: "*"
+    react-native: "*"
+  checksum: 10c0/3899ef9e88bcb139f724a140149311502f2d1e1d060d928886cfbe653d8245e76f39ac9a869ae3993d71840dfb0bd063102decc19510396a9a6aec0e1ba5fc57
+  languageName: node
+  linkType: hard
+
 "@react-native-community/netinfo@npm:^9.3.10":
   version: 9.4.1
   resolution: "@react-native-community/netinfo@npm:9.4.1"
@@ -4213,6 +4223,7 @@ __metadata:
     "@notifee/react-native": "npm:^9.1.8"
     "@react-native-async-storage/async-storage": "npm:^1.18.2"
     "@react-native-community/datetimepicker": "npm:^8.2.0"
+    "@react-native-community/geolocation": "npm:^3.4.0"
     "@react-native-community/netinfo": "npm:^9.3.10"
     "@react-native-community/push-notification-ios": "npm:^1.12.0"
     "@react-native-firebase/app": "npm:^18.1.0"
@@ -4287,7 +4298,6 @@ __metadata:
     styled-components: "npm:^5.3.11"
     toggle-switch-react-native: "npm:^3.3.0"
     typescript: "npm:^5.2.2"
-    vision-camera-barcode-scanner: "npm:^0.2.2"
     yup: "npm:^1.2.0"
   languageName: unknown
   linkType: soft
@@ -13559,18 +13569,6 @@ __metadata:
   version: 1.1.2
   resolution: "vary@npm:1.1.2"
   checksum: 10c0/f15d588d79f3675135ba783c91a4083dcd290a2a5be9fcb6514220a1634e23df116847b1cc51f66bfb0644cf9353b2abb7815ae499bab06e46dd33c1a6bf1f4f
-  languageName: node
-  linkType: hard
-
-"vision-camera-barcode-scanner@npm:^0.2.2":
-  version: 0.2.2
-  resolution: "vision-camera-barcode-scanner@npm:0.2.2"
-  peerDependencies:
-    react: "*"
-    react-native: "*"
-    react-native-reanimated: ">= 2"
-    react-native-vision-camera: ">= 2"
-  checksum: 10c0/6ce57ad9aa4d0675a304ce05b139dc46aee04b3502859bb740c7fd4c1669c9a4aae2899fcc7ce15c6d9bf3b23b24bc1a8d271cbd7648d55b330b9bffcd1351bb
   languageName: node
   linkType: hard
 
