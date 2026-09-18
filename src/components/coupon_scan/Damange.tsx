@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Dimensions,
   SafeAreaView,
@@ -14,7 +14,9 @@ import {
   Alert,
   ActivityIndicator,
   Platform,
+  Pressable,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, Header as HeaderRNE, Input } from '@rneui/themed';
 import QrScanComp from './QrScanComp';
 import ImageButton from '../comman/imageButton/ImageButton';
@@ -33,6 +35,8 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useTranslation } from 'react-i18next';
 import * as yup from 'yup';
 import { AttactmentIcon, CameraIcon, PhotosIcon } from '../Svg/Svg';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
+import { DocumentTile, KycCardHeader, KycField, kycStyles } from '../bottomtabs/profile/KycCardParts';
 import { API_URL } from '../../services/api_helper';
 import RNFS from 'react-native-fs';
 import ImageResizer from '@bam.tech/react-native-image-resizer';
@@ -43,6 +47,7 @@ export const DamageQrcodeValidation = yup.object({
   // attactmentThird: yup.mixed().required('Attactment third image is required'),
 });
 export default function Damage(props: any) {
+  const safeInsets = useSafeAreaInsets();
   const { t } = useTranslation();
   const navigation = useNavigation();
   const [isLoadingSubmit, setIsLoadingSubmit] = useState(false);
@@ -50,7 +55,7 @@ export default function Damage(props: any) {
   const [messageText, setMessageText] = useState('');
   const [buttonEnabled, setButtonEnabled] = useState(false);
   const [schemeActive, setSchemeActive] = useState(false);
-  const [serialNumber, setSerialNumber] = useState<any>(props?.route?.params?.code ? props?.route?.params?.code : '');
+  const [serialNumber, setSerialNumber] = useState<any>(props?.route?.params?.code ? String(props.route.params.code).slice(0, 8) : '');
   const [ggNumber, setGgNumber] = useState<any>();
 
   const [modalVisible, setModalVisible] = useState(false);
@@ -64,56 +69,81 @@ export default function Damage(props: any) {
   const [userData, setuserData] = useState()
 
 
+  // iOS can't present the camera/gallery while this Modal is still on screen
+  // (or animating out) - the picker call silently does nothing. So on iOS we
+  // wait for the Modal's onDismiss before opening the picker.
+  const pendingPickerAction = useRef<(() => void) | null>(null);
+
+  const closeModalThen = (action: () => void) => {
+    if (Platform.OS === 'ios') {
+      pendingPickerAction.current = action;
+      setModalVisible(false);
+    } else {
+      setModalVisible(false);
+      setTimeout(action, 500);
+    }
+  };
+
+  const onModalDismiss = () => {
+    const action = pendingPickerAction.current;
+    pendingPickerAction.current = null;
+    action?.();
+  };
+
+  const handlePickerError = (error: any) => {
+    console.log('Image picker error >>> ', error);
+    if (error?.code === 'E_PICKER_CANCELLED') {
+      return;
+    }
+    if (error?.code === 'E_NO_CAMERA_PERMISSION' || error?.code === 'E_NO_LIBRARY_PERMISSION') {
+      Alert.alert(
+        'Permission required',
+        'Please allow access from Settings to upload an image.',
+      );
+      return;
+    }
+    Alert.alert('Unable to open', error?.message || 'Something went wrong. Please try again.');
+  };
+
+  const onImagePicked = (type: any, imageValue: any, image: any) => {
+    console.log('imageimage', image);
+    if (type == 1) {
+      setFirstAttact(image?.path);
+      setFirstHeight(image?.height)
+      setFirstWidth(image?.width)
+      imageValue('attactmentFirst', `${image.path}`);
+    } else if (type == 2) {
+      setSecondAttact(image?.path);
+    } else if (type == 3) {
+      setThirdAttact(image?.path);
+    }
+  };
+
   const onSelectCamera = (imageData: any) => {
     const { type, imageValue } = imageData;
-    setModalVisible(false);
-    openCamera(type, imageValue);
+    closeModalThen(() => openCamera(type, imageValue));
   };
 
   const onSelectGallery = (imageData: any) => {
-    const { type, imageValue } = imageData;
-    setModalVisible(false);
-    takePhotoFromLibray(1, imageValue);
+    const { imageValue } = imageData;
+    closeModalThen(() => takePhotoFromLibray(1, imageValue));
   };
 
   const takePhotoFromLibray = (type: any, imageValue: any) => {
-    setTimeout(() => {
-      ImagePicker.openPicker({
-        cropping: false,
-      }).then(image => {
-        console.log("imageimage",image)
-        if (type == 1) {
-          setFirstAttact(image?.path);
-          setFirstHeight(image?.height)
-          setFirstWidth(image?.width)
-          imageValue('attactmentFirst', `${image.path}`);
-        } else if (type == 2) {
-          setSecondAttact(image?.path);
-        } else if (type == 3) {
-          setThirdAttact(image?.path);
-        }
-        console.log(image);
-      });
-    }, 500);
+    ImagePicker.openPicker({
+      cropping: false,
+      mediaType: 'photo',
+    })
+      .then(image => onImagePicked(type, imageValue, image))
+      .catch(handlePickerError);
   };
   const openCamera = (type: any, imageValue: any) => {
-    setTimeout(() => {
-      ImagePicker.openCamera({
-        cropping: false,
-      }).then(image => {
-        if (type == 1) {
-          setFirstAttact(image?.path);
-          setFirstHeight(image?.height)
-          setFirstWidth(image?.width)
-          imageValue('attactmentFirst', `${image.path}`);
-        } else if (type == 2) {
-          setSecondAttact(image?.path);
-        } else if (type == 3) {
-          setThirdAttact(image?.path);
-        }
-        console.log(image);
-      });
-    }, 500);
+    ImagePicker.openCamera({
+      cropping: false,
+      mediaType: 'photo',
+    })
+      .then(image => onImagePicked(type, imageValue, image))
+      .catch(handlePickerError);
   };
   const [schemeStartDate, setSchemeStartDate] = useState<Date>(
     new Date('2030-01-01'),
@@ -322,322 +352,382 @@ export default function Damage(props: any) {
 
 
   return (
-    <View style={{ backgroundColor: appTheme.APP_BACKGROUND_COLOR, flex: 1 }}>
-      <View
-        style={{
-          // width: width,
-          flex: 1,
-          backgroundColor: 'white',
-        }}>
-
-        <HeaderRNE
-         backgroundColor="white"
-         backgroundImageStyle={{}}
-         barStyle="dark-content"
-          centerContainerStyle={{ height: 28, justifyContent: 'center' }}
-          // containerStyle={{width: 350}}
-          leftComponent={
-            <TouchableOpacity
-              containerStyle={{ padding: 5 }}
-              onPress={() => props.navigation.push('Home')}>
-              <Ionicons name="chevron-back" size={25} color={'black'} />
-            </TouchableOpacity>
-          }
-          leftContainerStyle={{ paddingLeft: 5 }}
-          linearGradientProps={{}}
-          placement="center"
-          rightContainerStyle={{}}
-          statusBarProps={{}}
-          containerStyle={{
-            bottom: Platform.OS === "android"
-              ? Platform.OS === "android" && Platform.Version <= 34
-                ?0
-                : height * 0.04
-              : 0,
-              height:height*0.08,
-          }}
-          
-        />
-        <ScrollView>
-          <View
-            style={{
-              alignContent: 'center',
-              justifyContent: 'center',
-              alignItems: 'center',
-              marginTop: 10,
-            }}></View>
-          <View
-            style={{
-              // width: width,
-              flex: 1,
-              backgroundColor: 'white',
-            }}>
-            <Text style={[styles.textSubTitle]}>{`${t('DAMAGE_SCAN')}`}</Text>
-
-            <View style={{ alignItems: 'center', marginTop: 20 }}>
-              <ImageButton
-                buttonText=""
-                marker={require('../../../assets/images/Dummygg.jpeg')}
-                onPress={() => { }}
-                style={{ width: width }}
-                imgWidth={width}
-                imgHeight={180}
-                disabled={true}></ImageButton>
-            </View>
-
-            <Formik
-              // validationSchema={DamageQrcodeValidation}
-              enableReinitialize={true}
-              initialValues={{
-                attactmentFirst: '',
-                // attactmentSecond: '',
-                // attactmentThird: ''
-              }}
-              onSubmit={async values => {
-                if (firstAttact) {
-
-                  requestProfileImage()
-                } else {
-                  Alert.alert("Please upload your coupon image")
-                }
-                console.log('ddjdj', values);
-                // submitQRCODE(values)
-              }}>
-              {({
-                handleChange,
-                handleBlur,
-                handleSubmit,
-                values,
-                errors,
-                isValid,
-                touched,
-                setFieldValue,
-              }) => {
-                return (
-                  <>
-                    <View style={[styles.mainContainer, { marginHorizontal: 20 }]}>
-                      <View style={styles.pointContainer}>
-                        <View>
-                          <View style={styles.textContainer}>
-                            <Text style={styles.text}>
-                              Enter QR code Number (Optional)
-                            </Text>
-                          </View>
-
-                          <View
-                            style={[
-                              styles.inputBox,
-                              { borderColor: 'black', marginVertical: 10 },
-                            ]}>
-                            <TextInput
-                              style={styles.innerBox}
-                              autoCapitalize="none"
-                              placeholderTextColor={'grey'}
-                              // keyboardType='number-pad'
-                              //   maxLength={12}
-                              value={serialNumber}
-                              onChangeText={text => {
-                                setSerialNumber(text);
-                              }}
-                              // onBlur={handleBlur('aadharNo')}
-                              placeholder={`Enter QR code Number`}
-                            />
-                          </View>
-                        </View>
-                        {errors.attactmentFirst && touched.attactmentFirst && (
-                          <Text style={styles.errorText2}>
-                            {errors.attactmentFirst}
-                          </Text>
-                        )}
-                        <View>
-                          <View style={styles.textContainer}>
-                            <Text style={styles.text}>
-                              Enter GG Number
-                            </Text>
-                          </View>
-
-                          <View
-                            style={[
-                              styles.inputBox,
-                              { borderColor: 'black', marginVertical: 10 },
-                            ]}>
-                            <TextInput
-                              style={styles.innerBox}
-                              autoCapitalize="none"
-                              placeholderTextColor={'grey'}
-                              // keyboardType='number-pad'
-                              //   maxLength={12}
-                              value={ggNumber}
-                              onChangeText={text => {
-                                setGgNumber(text);
-                              }}
-                              // onBlur={handleBlur('aadharNo')}
-                              placeholder={`Enter GG Number`}
-                            />
-                          </View>
-                        </View>
-                        {/* {errors.attactmentFirst && touched.attactmentFirst && (
-                        <Text style={styles.errorText2}>
-                          {errors.attactmentFirst}
-                        </Text>
-                      )} */}
-                        <View
-                          style={{
-                            flexDirection: 'row',
-                            justifyContent: 'space-between',
-                            width: '100%',
-
-                            alignItems: 'center',
-                          }}>
-                          <TouchableOpacity
-                            style={styles.dragContainer}
-                            onPress={() => {
-                              console.log('shshhs');
-                              setModalVisible(true);
-                              setImageData({
-                                type: 1,
-                                imageValue: setFieldValue,
-                              });
-                            }}>
-                            <AttactmentIcon />
-                            <View style={styles.view}>
-                              <Text style={styles.dragText}>Upload Image</Text>
-                            </View>
-                          </TouchableOpacity>
-
-                          <View
-                            style={{
-                              width: '48%',
-                            }}>
-                            {imageData && firstAttact ? (
-                              <Image
-                                source={{
-                                  uri: firstAttact,
-                                }}
-                                style={styles.imageView2}
-                              />
-                            ) : (
-                              <View
-                                style={[
-                                  styles.imageView2,
-                                  {
-                                    backgroundColor: '#14347B',
-                                  },
-                                ]}
-                              />
-                            )}
-                          </View>
-                        </View>
-                      </View>
-
-                      <View style={{ marginHorizontal: 5, paddingHorizontal: 5 }}>
-                        {
-                          isLoadingSubmit ?
-                            <View style={{
-                              alignSelf: "center",
-                              backgroundColor: 'orange',
-                              borderRadius: 8,
-                              alignItems: 'center',
-                              height: 50,
-                              justifyContent: 'center',
-                              width: '100%'
-                            }}>
-                              <ActivityIndicator size={35} color={'white'} />
-                            </View>
-                            :
-                            <TouchableOpacity
-                              onPress={() => {
-                                if (firstAttact) {
-                                  handleSubmit();
-                                } else {
-                                  setModalVisible(true)
-                                  setImageData({
-                                    type: 1,
-                                    imageValue: setFieldValue,
-                                  });
-                                }
-                              }}
-                              style={{
-                                backgroundColor: 'orange',
-                                borderRadius: 8,
-                                alignItems: 'center',
-                                height: 50,
-                                justifyContent: 'center'
-                              }}>
-                              <Text style={{
-                                fontSize: 18,
-                                fontWeight: 'bold',
-                                color: '#FFFFFF'
-                              }}>{`${t('submit')}`}</Text>
-                            </TouchableOpacity>
-                          // <Button
-                          //   title={`${t('submit')}`}
-                          //   onPress={() => {
-                          //     console.log('sss');
-                          //     if(firstAttact){
-                          //       handleSubmit();
-                          //     } else{
-                          //       setModalVisible(true)
-                          //       setImageData({
-                          //         type: 1,
-                          //         imageValue: setFieldValue,
-                          //       });
-                          //     }
-                          //   }}
-                          //   color={'grey'}
-                          //   buttonStyle={{
-                          //     backgroundColor: 'orange',
-                          //     borderRadius: 8,
-                          //   }}
-                          //   loading={isLoadingSubmit}
-                          // />
-                          // )
-                        }
-
-                      </View>
-                    </View>
-                  </>
-                );
-              }}
-            </Formik>
-          </View>
-          <View style={{ height: 80 }} />
-        </ScrollView>
-        <Modal visible={modalVisible} animationType="slide" transparent={true}>
-          <View style={styles.modalContainer}>
-            <View style={styles.modalContent}>
-              <TouchableOpacity
-                onPress={() => {
-                  console.log(imageData, '77');
-                  onSelectCamera(imageData);
-                }}
-                style={{ flexDirection: 'row', marginVertical: 10 }}>
-                <CameraIcon />
-                <Text style={styles.optionText}>Camera</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => {
-                  onSelectGallery(imageData);
-                }}
-                style={{ flexDirection: 'row', marginVertical: 10 }}>
-                <PhotosIcon />
-                <Text style={styles.optionText}>Gallery</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => {
-                  setModalVisible(false);
-                }}
-                style={{ alignItems: 'flex-end' }}>
-                <Text style={styles.cancelText}>Cancel</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Modal>
+    // White behind the status bar so it blends with the header; the page itself is grey.
+    <View style={{ flex: 1, backgroundColor: 'white' }}>
+      <View style={dStyles.header}>
+        <Pressable
+          onPress={() => props.navigation.push('Home')}
+          hitSlop={6}
+          style={({ pressed }) => [dStyles.headerButton, pressed && { opacity: 0.6 }]}>
+          <Ionicons name="chevron-back" size={22} color={appTheme.DARK_BOTTOMTAB} />
+        </Pressable>
+        <Text style={dStyles.headerTitle} numberOfLines={1}>
+          Report Damaged Code
+        </Text>
+        <View style={{ width: 40 }} />
       </View>
 
+      <Formik
+        enableReinitialize={true}
+        initialValues={{ attactmentFirst: '' }}
+        onSubmit={async values => {
+          if (firstAttact) {
+            requestProfileImage();
+          } else {
+            Alert.alert('Please upload your coupon image');
+          }
+        }}>
+        {({ handleSubmit, setFieldValue }) => {
+          const openPicker = () => {
+            setModalVisible(true);
+            setImageData({ type: 1, imageValue: setFieldValue });
+          };
+          return (
+            <KeyboardAwareScrollView
+              style={{ backgroundColor: '#F7F7F7' }}
+              // Keep the last button clear of the Android nav bar / iPhone home indicator.
+        contentContainerStyle={{ paddingBottom: 40 + safeInsets.bottom }}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}>
+              {/* Intro */}
+              <View style={dStyles.intro}>
+                <View style={dStyles.introIcon}>
+                  <Ionicons name="warning-outline" size={22} color="#D93025" />
+                </View>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={dStyles.introTitle}>{`${t('DAMAGE_SCAN')}`}</Text>
+                  <Text style={dStyles.introText}>
+                    QR damaged or not scanning? Share the codes from the label and a photo — our team
+                    will verify and credit your points.
+                  </Text>
+                </View>
+              </View>
+
+              {/* Sample label */}
+              <View style={kycStyles.card}>
+                <KycCardHeader icon="information-circle-outline" title="Where to find the codes" />
+                <View style={dStyles.sampleWrap}>
+                  <Image
+                    source={require('../../../assets/images/Dummygg.jpeg')}
+                    style={dStyles.sampleImage}
+                  />
+                </View>
+                <View style={dStyles.hintRow}>
+                  <View style={dStyles.hintDot} />
+                  <Text style={dStyles.hintText}>
+                    <Text style={dStyles.hintBold}>QR code number</Text> is printed next to the QR
+                    (e.g. GS457GDR)
+                  </Text>
+                </View>
+                <View style={dStyles.hintRow}>
+                  <View style={dStyles.hintDot} />
+                  <Text style={dStyles.hintText}>
+                    <Text style={dStyles.hintBold}>GG number</Text> is on the product label (e.g.
+                    GG-GGT99)
+                  </Text>
+                </View>
+              </View>
+
+              {/* Codes */}
+              <View style={kycStyles.card}>
+                <KycCardHeader icon="create-outline" title="Code Details" />
+                <KycField
+                  label="QR Code Number (Optional)"
+                  icon="qr-code-outline"
+                  locked={false}
+                  value={serialNumber || ''}
+                  onChangeText={text => setSerialNumber(text.slice(0, 8))}
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  maxLength={8}
+                  placeholder="8-character code"
+                  helper={`${(serialNumber || '').length}/8 characters`}
+                />
+                <KycField
+                  label="GG Number"
+                  icon="barcode-outline"
+                  locked={false}
+                  value={ggNumber || ''}
+                  onChangeText={text => setGgNumber(text)}
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  placeholder="e.g. GG-GGT99"
+                />
+              </View>
+
+              {/* Photo */}
+              <View style={kycStyles.card}>
+                <KycCardHeader icon="camera-outline" title="Coupon Photo" required />
+                <DocumentTile
+                  uri={firstAttact || null}
+                  locked={false}
+                  emptyText="Tap to upload a clear photo of the coupon"
+                  onPick={openPicker}
+                  onRemove={() => {
+                    setFirstAttact(null);
+                    setFieldValue('attactmentFirst', '');
+                  }}
+                  onPreview={openPicker}
+                />
+              </View>
+
+              {/* Submit */}
+              <Pressable
+                disabled={isLoadingSubmit}
+                onPress={() => {
+                  if (firstAttact) {
+                    handleSubmit();
+                  } else {
+                    openPicker();
+                  }
+                }}
+                style={({ pressed }) => [
+                  dStyles.submitButton,
+                  pressed && { transform: [{ scale: 0.98 }] },
+                ]}>
+                {isLoadingSubmit ? (
+                  <ActivityIndicator color={appTheme.DARK_BOTTOMTAB} />
+                ) : (
+                  <>
+                    <Ionicons name="send" size={18} color={appTheme.DARK_BOTTOMTAB} />
+                    <Text style={dStyles.submitText}>
+                      {firstAttact ? `${t('submit')}` : 'Upload Photo & Submit'}
+                    </Text>
+                  </>
+                )}
+              </Pressable>
+            </KeyboardAwareScrollView>
+          );
+        }}
+      </Formik>
+
+      <Modal
+        visible={modalVisible}
+        animationType="slide"
+        transparent={true}
+        onDismiss={onModalDismiss}
+        onRequestClose={() => setModalVisible(false)}>
+        <Pressable style={dStyles.sheetBackdrop} onPress={() => setModalVisible(false)}>
+          <Pressable style={dStyles.sheet} onPress={() => {}}>
+            <View style={dStyles.sheetHandle} />
+            <Text style={dStyles.sheetTitle}>Upload coupon photo</Text>
+            <View style={dStyles.sheetOptions}>
+              <Pressable
+                onPress={() => onSelectCamera(imageData)}
+                style={({ pressed }) => [dStyles.sheetOption, pressed && { opacity: 0.7 }]}>
+                <View style={[dStyles.sheetOptionIcon, { backgroundColor: '#E8F0FF' }]}>
+                  <Ionicons name="camera" size={24} color="#2F6FED" />
+                </View>
+                <Text style={dStyles.sheetOptionText}>Camera</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => onSelectGallery(imageData)}
+                style={({ pressed }) => [dStyles.sheetOption, pressed && { opacity: 0.7 }]}>
+                <View style={[dStyles.sheetOptionIcon, { backgroundColor: '#E4F6EC' }]}>
+                  <Ionicons name="images" size={24} color="#1E9E5A" />
+                </View>
+                <Text style={dStyles.sheetOptionText}>Gallery</Text>
+              </Pressable>
+            </View>
+            <Pressable onPress={() => setModalVisible(false)} style={dStyles.sheetCancel}>
+              <Text style={dStyles.sheetCancelText}>Cancel</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
+
+const dStyles = StyleSheet.create({
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'white',
+    paddingHorizontal: 16,
+    paddingTop: 6,
+    paddingBottom: 12,
+    borderBottomLeftRadius: 22,
+    borderBottomRightRadius: 22,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 4,
+    zIndex: 2,
+  },
+  headerButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#F4F4F4',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1C1C1C',
+  },
+  intro: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    width: '90%',
+    alignSelf: 'center',
+    marginTop: 16,
+    backgroundColor: '#FFF6F5',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#FBE0DE',
+    padding: 14,
+  },
+  introIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    backgroundColor: '#FDECEA',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  introTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1C1C1C',
+  },
+  introText: {
+    fontSize: 12,
+    color: '#6B6B6B',
+    marginTop: 4,
+    lineHeight: 17,
+  },
+  sampleWrap: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#EFEFEF',
+    backgroundColor: 'white',
+    padding: 6,
+    overflow: 'hidden',
+  },
+  sampleImage: {
+    width: '100%',
+    height: 120,
+    resizeMode: 'contain',
+  },
+  hintRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginTop: 10,
+  },
+  hintDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: appTheme.NEW_PALLET,
+    marginTop: 6,
+    marginRight: 8,
+  },
+  hintText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#6B6B6B',
+    lineHeight: 17,
+  },
+  hintBold: {
+    fontWeight: '700',
+    color: '#1C1C1C',
+  },
+  submitButton: {
+    flexDirection: 'row',
+    width: '90%',
+    alignSelf: 'center',
+    marginTop: 20,
+    height: 52,
+    borderRadius: 14,
+    backgroundColor: appTheme.NEW_PALLET,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#C9962F',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  submitText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: appTheme.DARK_BOTTOMTAB,
+    marginLeft: 8,
+  },
+  sheetBackdrop: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+  sheet: {
+    backgroundColor: 'white',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 34,
+  },
+  sheetHandle: {
+    alignSelf: 'center',
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#DDDDDD',
+    marginBottom: 14,
+  },
+  sheetTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1C1C1C',
+    textAlign: 'center',
+  },
+  sheetOptions: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 16,
+    marginTop: 18,
+  },
+  sheetOption: {
+    flex: 1,
+    alignItems: 'center',
+    borderRadius: 16,
+    backgroundColor: '#F7F7F7',
+    paddingVertical: 16,
+  },
+  sheetOptionIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sheetOptionText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1C1C1C',
+    marginTop: 8,
+  },
+  sheetCancel: {
+    marginTop: 16,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: '#FDECEA',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sheetCancelText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#D93025',
+  },
+});
 
 const styles = StyleSheet.create({
   centerText: {

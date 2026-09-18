@@ -10,8 +10,12 @@ import {
   TextInput,
   ImageBackground,
   ToastAndroid,
+  Alert,
+  Platform,
+  ActivityIndicator,
 } from 'react-native';
-import React, { useEffect, useState } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import React, { useEffect, useRef, useState } from 'react';
 import imagePath from '../../../constants/imagePath';
 import { Dropdown } from 'react-native-element-dropdown';
 import {
@@ -21,7 +25,7 @@ import {
 } from 'react-native-responsive-dimensions';
 import colors from '../../../styles/colors';
 import DashedLine from 'react-native-dashed-line';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Image as ImageRNE } from '@rneui/themed';
 import {
   requestGetAuthCustomerInfo,
@@ -34,7 +38,17 @@ import {
   requestUpdateCustomerDetail,
   requestUpdateCustomerKycInfo,
   requestUpdateCustomerLocation,
+  postupdatebankinfo,
+  requestUpdateCustomerAddress,
 } from '../../../services/backend_helper';
+import {
+  requestLocationPermission,
+  getCurrentCoordinates,
+  toGeoJsonCoordinates,
+  alertLocationPermissionDenied,
+  alertLocationPermissionBlocked,
+  alertLocationUnavailable,
+} from '../../../utils/locationHelper';
 import { NavigationInterFace } from '../../../interfaces/navigationType.interface';
 import * as Yup from 'yup';
 import { useFormik } from 'formik';
@@ -65,11 +79,30 @@ import { mpstate } from './city';
 import CustomerTypeDropDowm from '../../comman/Address/CustomerTypeDropDowm';
 import navigationStrings from '../../../constants/navigationStrings';
 import { launchImageLibrary } from 'react-native-image-picker';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
-import { requestCameraPermission, requestGalleryPermission } from './permission';
+import AadhaarKycCard from './AadhaarKycCard';
+import PassbookBankCard from './PassbookBankCard';
+import PanKycCard from './PanKycCard';
+import UpiKycCard from './UpiKycCard';
+import ShopImageCard from './ShopImageCard';
+import { KycCardHeader, KycField, kycStyles } from './KycCardParts';
+import LinearGradient from 'react-native-linear-gradient';
+import { getUpiError, normalizeUpi } from '../../../utils/upi';
+import { getPanError, normalizePan } from '../../../utils/pan';
+import {
+  BANK_FIELDS,
+  bankDetailsChanged,
+  getBankFieldError,
+} from '../../../utils/bankDetails';
+import { getAadhaarError, normalizeAadhaar } from '../../../utils/aadhaar';
+import { cropPickedImage, requestCameraPermission, requestGalleryPermission, showImagePickerError } from './permission';
 
 const Profile = (props: any) => {
+  const safeInsets = useSafeAreaInsets();
+  // The same screen serves two routes: the main Profile (personal details,
+  // shop address, shop image) and "KYC Details" (Aadhaar, bank, PAN, UPI),
+  // opened with navigation.push(PROFILE, { section: 'kyc' }).
+  const isKycSection = props.route?.params?.section === 'kyc';
   const { height, width } = Dimensions.get('window');
   const navigation = useNavigation<NavigationInterFace>();
   const [profileData, setProfileData] = useState<ViewAuthInfoInterface>();
@@ -164,6 +197,69 @@ const Profile = (props: any) => {
   const { country, statename, city } = props;
   const [visibleAvatar, setvisibleAvatar] = useState(false);
   const [visibleShop, setvisibleShop] = useState(false);
+  // The pickers are presented on top of the dialog; closing the dialog at the
+  // same time tears the picker down with it on iOS. Wait for the dialog's
+  // close animation to finish before opening the camera/gallery.
+  const afterDialogClosed = (open: () => void) => {
+    setTimeout(open, Platform.OS === 'ios' ? 600 : 300);
+  };
+
+  const [updatingLocation, setUpdatingLocation] = useState(false);
+
+  /**
+   * Detects the current position and saves it straight away - no separate
+   * screen. updateAddress replaces the whole address, so the saved address is
+   * fetched first and sent back unchanged alongside the new coordinates.
+   */
+  const updateLocationNow = async () => {
+    if (updatingLocation) {
+      return;
+    }
+    setUpdatingLocation(true);
+    try {
+      const status = await requestLocationPermission();
+      if (status === 'blocked') {
+        alertLocationPermissionBlocked();
+        return;
+      }
+      if (status === 'denied') {
+        alertLocationPermissionDenied(() => updateLocationNow());
+        return;
+      }
+
+      const [position, addressRes] = await Promise.all([
+        getCurrentCoordinates(),
+        requestGetCustomerAddress({}).catch(() => null),
+      ]);
+      if (!position) {
+        alertLocationUnavailable(() => updateLocationNow());
+        return;
+      }
+
+      const saved = addressRes?.isError === false && addressRes?.data ? addressRes.data : {};
+      const res = await requestUpdateCustomerAddress({
+        postalCode: saved.postalCode ?? '',
+        address: saved.address ?? '',
+        city: saved.city ?? '',
+        state: saved.state ?? '',
+        country: saved.country ?? 'India',
+        coordinates: toGeoJsonCoordinates(position),
+      });
+      if (res?.isError !== false) {
+        throw new Error(res?.message);
+      }
+      Alert.alert(
+        'Location updated',
+        `Your shop location has been saved.\n\nLatitude: ${position.latitude.toFixed(6)}\nLongitude: ${position.longitude.toFixed(6)}`,
+      );
+    } catch (error: any) {
+      console.log('Update location error >>> ', error?.response ?? error);
+      Alert.alert(`${t('updatelocation')}`, `${t('locationupdatefailed')}`);
+    } finally {
+      setUpdatingLocation(false);
+    }
+  };
+
   const toggleDialogAvatar = () => {
     setvisibleAvatar(!visibleAvatar);
     // setdisabledInput(true)
@@ -193,7 +289,7 @@ const Profile = (props: any) => {
     });
   };
   const newAadharFront = async () => {
-    const granted = await requestCameraPermission();
+    const granted = await requestCameraPermission(newGalleryAadharFront);
 
     if (!granted) {
       return;
@@ -217,11 +313,11 @@ const Profile = (props: any) => {
       toggleDialogAF();
     }).catch(err => {
       toggleDialogAF();
-      console.error('Error occurred while selecting Aadhar Front image:', err);
+      showImagePickerError(err);
     });
   };
   const newAadharBack = async () => {
-    const granted = await requestCameraPermission();
+    const granted = await requestCameraPermission(newGalleryAadharBack);
 
     if (!granted) {
       return;
@@ -244,7 +340,7 @@ const Profile = (props: any) => {
       await verifiedFormik.setFieldValue('aadharBackImage', `${image.path}`);
     }).catch(err => {
       toggleDialogAB()
-      console.error('Error occurred while selecting Aadhar Back image:', err);
+      showImagePickerError(err);
     });
   };
   const newGalleryAadharFront = async () => {
@@ -266,12 +362,7 @@ const Profile = (props: any) => {
         if (!image) return;
 
         try {
-          const croppedImage = await ImageCropPicker.openCropper({
-            path: image.uri!, // picked image URI
-            mediaType: 'photo',
-            cropping: true,
-            freeStyleCropEnabled: true,
-          });
+          const croppedImage = await cropPickedImage(image.uri!);
 
           // Update conditional API state
           setConditionalAPI((conditionalAPI: any) => ({
@@ -291,7 +382,7 @@ const Profile = (props: any) => {
           toggleDialogAF();
 
         } catch (err) {
-          console.log('Cropping cancelled or failed', err);
+          showImagePickerError(err);
           toggleDialogAF();
 
         }
@@ -318,12 +409,7 @@ const Profile = (props: any) => {
         if (!image) return;
 
         try {
-          const croppedImage = await ImageCropPicker.openCropper({
-            path: image.uri!, // picked image URI
-            mediaType: 'photo',
-            cropping: true,
-            freeStyleCropEnabled: true,
-          });
+          const croppedImage = await cropPickedImage(image.uri!);
           toggleDialogAB();
           // Update conditional API state
           setConditionalAPI((conditionalAPI: any) => ({
@@ -341,7 +427,7 @@ const Profile = (props: any) => {
           // Update Formik field
           verifiedFormik.setFieldValue('aadharBackImage', croppedImage.path);
         } catch (err) {
-          console.log('Cropping cancelled or failed', err);
+          showImagePickerError(err);
           toggleDialogAB();
         }
       }
@@ -349,7 +435,7 @@ const Profile = (props: any) => {
   };
 
   const newPassbook = async () => {
-    const granted = await requestCameraPermission();
+    const granted = await requestCameraPermission(newGalleryPassbook);
 
     if (!granted) {
       return;
@@ -372,12 +458,12 @@ const Profile = (props: any) => {
       await verifiedFormik.setFieldValue('passbookImage', `${image.path}`);
       toggleDialogP();
     }).catch(err => {
-      console.error('Error occurred while selecting Passbook image:', err);
+      showImagePickerError(err);
       toggleDialogP();
     });
   };
   const newPAN = async () => {
-    const granted = await requestCameraPermission();
+    const granted = await requestCameraPermission(newGalleryPAN);
 
     if (!granted) {
       return;
@@ -400,7 +486,7 @@ const Profile = (props: any) => {
       await verifiedFormik.setFieldValue('panImage', `${image.path}`);
       toggleDialogPAN();
     }).catch(err => {
-      console.error('Error occurred while selecting PAN image:', err);
+      showImagePickerError(err);
       toggleDialogPAN();
     });
   };
@@ -423,12 +509,7 @@ const Profile = (props: any) => {
         if (!image) return;
 
         try {
-          const croppedImage = await ImageCropPicker.openCropper({
-            path: image.uri!, // picked image URI
-            mediaType: 'photo',
-            cropping: true,
-            freeStyleCropEnabled: true,
-          });
+          const croppedImage = await cropPickedImage(image.uri!);
 
           // Update conditional API state
           setConditionalAPI((conditionalAPI: any) => ({
@@ -447,7 +528,7 @@ const Profile = (props: any) => {
           verifiedFormik.setFieldValue('panImage', croppedImage.path);
           toggleDialogPAN();
         } catch (err) {
-          console.log('Cropping cancelled or failed', err);
+          showImagePickerError(err);
           toggleDialogPAN();
         }
       }
@@ -456,7 +537,7 @@ const Profile = (props: any) => {
 
 
   const newUPIID = async () => {
-    const granted = await requestCameraPermission();
+    const granted = await requestCameraPermission(newGalleryUPIID);
 
     if (!granted) {
       return;
@@ -479,7 +560,7 @@ const Profile = (props: any) => {
       await verifiedFormik.setFieldValue('upiImage', `${image.path}`);
       toggleDialogUPIID();
     }).catch(err => {
-      console.error('Error occurred while selecting UPI ID image:', err);
+      showImagePickerError(err);
       toggleDialogUPIID();
     });
   };
@@ -502,12 +583,7 @@ const Profile = (props: any) => {
         if (!image) return;
 
         try {
-          const croppedImage = await ImageCropPicker.openCropper({
-            path: image.uri!, // picked image URI
-            mediaType: 'photo',
-            cropping: true,
-            freeStyleCropEnabled: true,
-          });
+          const croppedImage = await cropPickedImage(image.uri!);
 
           // Update conditional API state
           setConditionalAPI((conditionalAPI: any) => ({
@@ -526,7 +602,7 @@ const Profile = (props: any) => {
           verifiedFormik.setFieldValue('upiImage', croppedImage.path);
           toggleDialogUPIID();
         } catch (err) {
-          console.log('Cropping cancelled or failed', err);
+          showImagePickerError(err);
           toggleDialogUPIID();
         }
       }
@@ -554,12 +630,7 @@ const Profile = (props: any) => {
         if (!image) return;
 
         try {
-          const croppedImage = await ImageCropPicker.openCropper({
-            path: image.uri!, // picked image URI
-            mediaType: 'photo',
-            cropping: true,
-            freeStyleCropEnabled: true,
-          });
+          const croppedImage = await cropPickedImage(image.uri!);
 
           // Update conditional API state
           setConditionalAPI((conditionalAPI: any) => ({
@@ -579,7 +650,7 @@ const Profile = (props: any) => {
           toggleDialogP();
 
         } catch (err) {
-          console.log('Cropping cancelled or failed', err);
+          showImagePickerError(err);
           toggleDialogP();
 
         }
@@ -588,6 +659,12 @@ const Profile = (props: any) => {
   };
 
   const avatarCamera = async () => {
+    const granted = await requestCameraPermission(avatarGallery);
+
+    if (!granted) {
+      setvisibleAvatar(false);
+      return;
+    }
     ImageCropPicker.openCamera({
       compressImageQuality: 0.5,
       freeStyleCropEnabled: true,
@@ -604,6 +681,10 @@ const Profile = (props: any) => {
         uri: `${image.path}`,
       });
       await verifiedFormik.setFieldValue('avatar', `${image.path}`);
+      setvisibleAvatar(false);
+    }).catch(err => {
+      setvisibleAvatar(false);
+      showImagePickerError(err);
     });
   };
   const avatarGallery = async () => {
@@ -621,12 +702,7 @@ const Profile = (props: any) => {
         if (!image) return;
 
         try {
-          const croppedImage = await ImageCropPicker.openCropper({
-            path: image.uri!, // picked image URI
-            mediaType: 'photo',
-            cropping: true,
-            freeStyleCropEnabled: true,
-          });
+          const croppedImage = await cropPickedImage(image.uri!);
 
           // Update conditional API state
           setConditionalAPI((conditionalAPI: any) => ({
@@ -644,16 +720,17 @@ const Profile = (props: any) => {
           // Set formik field
           verifiedFormik.setFieldValue('avatar', croppedImage.path);
         } catch (err) {
-          console.log('Cropping cancelled or failed', err);
+          showImagePickerError(err);
         }
       }
     );
   };
 
   const shopCamera = async () => {
-    const granted = await requestCameraPermission();
+    const granted = await requestCameraPermission(shopGallery);
 
     if (!granted) {
+      setvisibleShop(false);
       return;
     }
     ImageCropPicker.openCamera({
@@ -672,6 +749,10 @@ const Profile = (props: any) => {
         uri: `${image.path}`,
       });
       await verifiedFormik.setFieldValue('shopimage', image.path);
+      setvisibleShop(false);
+    }).catch(err => {
+      setvisibleShop(false);
+      showImagePickerError(err);
     });
   };
 
@@ -707,12 +788,7 @@ const Profile = (props: any) => {
           //   cropping: true,
           // });
 
-          const croppedImage = await ImageCropPicker.openCropper({
-            path: image.uri!, // picked image URI
-            mediaType: 'photo',
-            cropping: true,
-            freeStyleCropEnabled: true,
-          })
+          const croppedImage = await cropPickedImage(image.uri!)
 
           // Step 3: Save cropped image
           setConditionalAPI((conditionalAPI: any) => ({
@@ -728,7 +804,7 @@ const Profile = (props: any) => {
 
           verifiedFormik.setFieldValue('shopimage', croppedImage.path);
         } catch (err) {
-          console.log('Cropping cancelled or failed', err);
+          showImagePickerError(err);
         }
       }
     );
@@ -752,7 +828,13 @@ const Profile = (props: any) => {
   //     `${t('requirederror', { fieldname: `${t('aadharcardback')}` })}`,
   //   ),
   // });
-  const verifiedValidationSchema = Yup.object({
+  // Values already saved on the server are never re-validated: older records
+  // may not match today's format rules and must not block the Submit button.
+  const isUnchanged = (field: string, value: any) =>
+    `${value ?? ''}`.replace(/\s/g, '').toUpperCase() ===
+    `${dbKyc?.[field] ?? ''}`.replace(/\s/g, '').toUpperCase();
+
+  const allValidationRules: any = {
     shopimage: Yup.string().required(
       t('requirederror', { fieldname: t('shopimage') })
     ),
@@ -768,16 +850,79 @@ const Profile = (props: any) => {
     aadharBackImage: Yup.string().required(
       t('requirederror', { fieldname: t('aadharcardback') })
     ),
-  });
+    // Optional, but when filled it must be a real Aadhaar number.
+    aadharNo: Yup.string()
+      .nullable()
+      .test('aadhaar', function (value) {
+        if (isUnchanged('aadharNo', value)) {
+          return true;
+        }
+        const message = getAadhaarError(value || '');
+        return message ? this.createError({ message }) : true;
+      }),
+    // Optional. Only checked when changed, so an already-saved UPI ID never blocks submit.
+    upiNumber: Yup.string()
+      .nullable()
+      .test('upi', function (value) {
+        if (isUnchanged('upiNumber', value)) {
+          return true;
+        }
+        const message = getUpiError(value || '');
+        return message ? this.createError({ message }) : true;
+      }),
+    // Optional, but when filled it must be a valid PAN.
+    panNo: Yup.string()
+      .nullable()
+      .test('pan', function (value) {
+        if (isUnchanged('panNo', value)) {
+          return true;
+        }
+        const message = getPanError(value || '');
+        return message ? this.createError({ message }) : true;
+      }),
+    // Optional bank details: each field may be empty, but a filled one must be valid.
+    ...Object.fromEntries(
+      BANK_FIELDS.map(field => [
+        field,
+        Yup.string()
+          .nullable()
+          .test('bank-' + field, function (value) {
+            if (isUnchanged(field, value)) {
+              return true;
+            }
+            const message = getBankFieldError(field, this.parent);
+            return message ? this.createError({ message }) : true;
+          }),
+      ]),
+    ),
+  };
+  // Each screen only validates what it shows, so a missing Aadhaar image can't
+  // silently block the Profile submit (and vice versa).
+  const verifiedValidationSchema = Yup.object(
+    Object.fromEntries<any>(
+      Object.entries(allValidationRules).filter(([field]) =>
+        isKycSection ? field !== 'shopimage' : field === 'shopimage',
+      ),
+    ),
+  );
 
 
 
-  const [dbKyc, setDbKyc] = useState({});
+  const [dbKyc, setDbKyc] = useState<any>({});
+
+  // ToastAndroid does nothing on iOS, so fall back to an alert there.
+  const showMessage = (message: string) => {
+    if (Platform.OS === 'android') {
+      ToastAndroid.show(message, ToastAndroid.SHORT);
+    } else {
+      Alert.alert(message);
+    }
+  };
 
   // ----------SUBMIT BUTTON API----------
   const finalSubmit = async () => {
-    if (upiIdNumber && (!conditonalAPI.upiImage && !verifiedFormik.values['upiImage'])) {
-      ToastAndroid.show('UPI screenshot is required', ToastAndroid.SHORT);
+    if (isKycSection && upiIdNumber && !verifiedFormik.values['upiImage']) {
+      showMessage('UPI screenshot is required');
       return
     }
     try {
@@ -788,6 +933,10 @@ const Profile = (props: any) => {
       let formdata = new FormData();
       formdata.append('firmName', verifiedFormik?.values?.firmName);
       formdata.append('contactPerson', verifiedFormik?.values?.contactPerson);
+      // Only send buyerName when it's set (or clearing a saved one): a backend
+      // without this field rejects unknown fields and would fail the whole update.
+      const buyerName = (verifiedFormik?.values?.buyerName || '').trim();
+      if (buyerName || dbKyc?.buyerName) formdata.append('buyerName', buyerName);
       formdata.append('mobile', verifiedFormik?.values?.mobile);
       formdata.append('customerType', CustomerTypeNew);
       formdata.append('address[state]', verifiedFormik?.values?.state);
@@ -796,7 +945,11 @@ const Profile = (props: any) => {
       formdata.append('address[address]', verifiedFormik?.values?.address);
 
       // Append UPI Number
-      formdata.append("upiNumber", upiIdNumber || "");
+      formdata.append("upiNumber", normalizeUpi(upiIdNumber || ""));
+      const aadharNo = normalizeAadhaar(verifiedFormik?.values?.aadharNo || '');
+      if (aadharNo) formdata.append('aadharNo', aadharNo);
+      const panNo = normalizePan(verifiedFormik?.values?.panNo || '');
+      if (panNo) formdata.append('panNo', panNo);
       if (aadharFrontObject) formdata.append('aadharimage', aadharFrontObject);
       if (aadharBackObject) formdata.append('aadharBackImage', aadharBackObject);
       if (passbookObject) formdata.append('passbookImage', passbookObject);
@@ -811,22 +964,60 @@ const Profile = (props: any) => {
         headers: myHeaders,
         body: formdata,
       });
-      if (!response.ok) {
-        throw new Error(`HTTP error! Status: ${response.status}`);
+      // Read the body even on 4xx - the server puts the real reason in `message`.
+      const rawBody = await response.text();
+      let resData: any = null;
+      try {
+        resData = JSON.parse(rawBody);
+      } catch {
+        resData = null;
       }
-      let resData = await response.json();
+      if (!response.ok) {
+        console.log('updatePersonalInfo failed >>> ', response.status, rawBody);
+        throw new Error(
+          resData?.message || `Something went wrong (status ${response.status}). Please try again.`,
+        );
+      }
       if (resData?.isError === false) {
+        // Bank details go through their own API. Only call it when they changed:
+        // it resets the admin's bank verification, which IMPS payouts depend on.
+        const bankDetails = {
+          accountNo: (verifiedFormik.values.accountNo || '').trim(),
+          holderName: (verifiedFormik.values.holderName || '').trim(),
+          bankName: (verifiedFormik.values.bankName || '').trim(),
+          ifsc: (verifiedFormik.values.ifsc || '').trim(),
+        };
+        if (bankDetailsChanged(bankDetails, dbKyc)) {
+          try {
+            const bankRes = await postupdatebankinfo(bankDetails);
+            if (bankRes?.isError !== false) {
+              throw new Error(bankRes?.message || 'Bank details could not be saved');
+            }
+          } catch (bankError: any) {
+            console.log('updatebankInfo failed >>> ', bankError);
+            Alert.alert(
+              'Bank details not saved',
+              'Your KYC was submitted, but the bank details could not be saved. Please try again.',
+            );
+            return;
+          }
+        }
         setShowSubmitMsg(true);
         setMsgTxt('Your KYC details have been sent for verification');
-        navigation.navigate(navigationStrings.HOME)
-        ToastAndroid.show('Your KYC details have been sent for verification', ToastAndroid.SHORT);
+        if (isKycSection) {
+          navigation.goBack();
+        } else {
+          navigation.navigate(navigationStrings.HOME);
+        }
+        showMessage('Your KYC details have been sent for verification');
       } else {
         throw new Error(resData?.message || 'Unknown error occurred');
       }
     } catch (error: any) {
-      console.error('API Error:', error);
+      console.log('API Error:', error);
       setShowSubmitMsg(true);
       setMsgTxt(error.message);
+      Alert.alert('Profile update failed', error.message);
     }
   };
 
@@ -838,6 +1029,27 @@ const Profile = (props: any) => {
     enableReinitialize: true,
     validateOnMount: true,
   });
+
+  // Status of each KYC document for the summary card on the Profile screen.
+  const kycState = (verified: boolean, uploaded: any) =>
+    verified ? 'verified' : uploaded ? 'pending' : 'missing';
+  const kycItems = [
+    { key: 'aadhaar', label: 'Aadhaar', state: kycState(verificationDB.aadharVerified === true, dbKyc?.aadharFrontImage) },
+    { key: 'bank', label: 'Bank', state: kycState(verificationDB.bankVerified === true, dbKyc?.passbookImage || dbKyc?.accountNo) },
+    { key: 'pan', label: 'PAN', state: kycState(verificationDB.panVerified === true, dbKyc?.panImage || dbKyc?.panNo) },
+    { key: 'upi', label: 'UPI', state: kycState(verificationDB.upiVerified === true, dbKyc?.upiNumber) },
+  ];
+
+  // Refresh when coming back from the KYC Details screen so the summary is current.
+  const hasFocusedOnce = useRef(false);
+  useFocusEffect(
+    React.useCallback(() => {
+      if (hasFocusedOnce.current && !isKycSection) {
+        finalFetchProfileInfo();
+      }
+      hasFocusedOnce.current = true;
+    }, [isKycSection]),
+  );
 
   // ----------FETCH PROFILE DATA----------
   useEffect(() => {
@@ -1017,43 +1229,59 @@ const Profile = (props: any) => {
 
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.white }}>
-      <SafeAreaView style={{ flex: 1 }}>
-        <HeaderRNE
-          backgroundColor="white"
-          barStyle="dark-content"
-          centerComponent={{
-            text: 'Profile',
-            style: { color: 'black', fontSize: 22 },
-          }}
-          leftComponent={
-            <Pressable
-              onPress={() =>
-                props.route.params?.data == true
-                  ? navigation.navigate('Home')
-                  : props.navigation.goBack()
-              }>
-              <Ionicons name="chevron-back" size={25} color={'black'} />
-            </Pressable>
-          }
-          containerStyle={{ marginTop: -45 }}
-          placement="center"
-        />
+    // White behind the status bar so it blends with the header; the page itself is grey.
+    <View style={{ flex: 1, backgroundColor: 'white' }}>
+      {/* Router already pads for the status bar; a second SafeAreaView doubled the gap. */}
+      <View style={{ flex: 1 }}>
+        <View style={pStyles.header}>
+          <Pressable
+            onPress={() =>
+              props.route.params?.data == true
+                ? navigation.navigate('Home')
+                : props.navigation.goBack()
+            }
+            hitSlop={6}
+            style={({ pressed }) => [pStyles.headerButton, pressed && { opacity: 0.6 }]}>
+            <Ionicons name="chevron-back" size={22} color={appTheme.DARK_BOTTOMTAB} />
+          </Pressable>
+          <Text style={pStyles.headerTitle}>{isKycSection ? 'KYC Details' : 'Profile'}</Text>
+          <View style={{ width: 40 }} />
+        </View>
         <KeyboardAwareScrollView
-          style={{ marginTop: responsiveHeight(1) }}
+          style={{ backgroundColor: '#F7F7F7' }}
+          // Keep the last button clear of the Android nav bar / iPhone home indicator.
+          contentContainerStyle={{ paddingBottom: safeInsets.bottom }}
           showsVerticalScrollIndicator={false}>
           <View style={{ flex: 1, marginBottom: 20 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <View
-                style={{
-                  marginHorizontal: responsiveWidth(4),
-                  flexDirection: 'row',
-                  justifyContent: 'space-between',
-                }}>
-                <View style={{ flexDirection: 'row' }}>
+            {isKycSection ? (
+              <View style={pStyles.kycIntro}>
+                <View style={pStyles.kycIntroIcon}>
+                  <FontAwesome name="id-card" size={18} color={appTheme.DARK_BOTTOMTAB} />
+                </View>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={pStyles.kycIntroTitle}>Complete your KYC</Text>
+                  <Text style={pStyles.kycIntroText}>
+                    Verified KYC is required to redeem your points to your bank account.
+                  </Text>
+                </View>
+              </View>
+            ) : null}
+            {!isKycSection && (<>
+            {/* Profile summary */}
+            <LinearGradient
+              colors={['#2B2829', appTheme.DARK_BOTTOMTAB, '#4A4344']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={pStyles.summaryCard}>
+              <View style={pStyles.summaryDecor} />
+              <View style={pStyles.summaryRow}>
+                <Pressable
+                  disabled={disabledInput}
+                  onPress={toggleDialogAvatar}
+                  style={pStyles.avatarWrap}>
                   {verifiedFormik?.values['avatar'] ? (
-                    <ImageRNE
-                      style={{ height: 60, width: 60, borderRadius: 30 }}
+                    <Image
+                      style={pStyles.avatar}
                       source={{
                         uri: conditonalAPI.avatar
                           ? `${imagePath.IMAGE_URL}${verifiedFormik.values['avatar']}`
@@ -1062,620 +1290,363 @@ const Profile = (props: any) => {
                       }}
                     />
                   ) : (
-                    <Ionicons name="person-circle-outline" size={100} />
+                    <View style={[pStyles.avatar, pStyles.avatarPlaceholder]}>
+                      <Ionicons name="person" size={34} color={appTheme.DARK_BOTTOMTAB} />
+                    </View>
                   )}
-                </View>
-                <View
-                  style={{
-                    alignItems: 'baseline',
-                    marginHorizontal: responsiveWidth(4),
-                  }}>
-                  <Text
-                    style={{
-                      fontSize: 18,
-                      fontWeight: 'bold',
-                      color: 'black',
-                    }}>
-                    {profileData?.contactPerson}
+                  {!disabledInput ? (
+                    <View style={pStyles.avatarBadge}>
+                      <Ionicons name="camera" size={13} color={appTheme.DARK_BOTTOMTAB} />
+                    </View>
+                  ) : null}
+                </Pressable>
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text style={pStyles.summaryName} numberOfLines={1}>
+                    {profileData?.contactPerson || verifiedFormik?.values?.contactPerson}
                   </Text>
-                  <Text
-                    style={{
-                      paddingTop: 5,
-                      fontSize: 17,
-                      color: 'grey',
-                    }}>
-                    {'+91 ' + verifiedFormik?.values?.mobile}
+                  <Text style={pStyles.summaryMobile}>
+                    {'+91 ' + (verifiedFormik?.values?.mobile ?? '')}
                   </Text>
+                  {ggNumber ? (
+                    <View style={pStyles.typeChip}>
+                      <Ionicons name="storefront-outline" size={12} color={appTheme.DARK_BOTTOMTAB} />
+                      <Text style={pStyles.typeChipText}>{ggNumber}</Text>
+                    </View>
+                  ) : null}
                 </View>
               </View>
-              <View
-                style={{
-                  alignItems: 'flex-end',
-                  justifyContent: 'center',
-                  marginHorizontal: responsiveWidth(2),
-                  flex: 1,
-                }}>
-                <BRNE
-                  // title={'Edit Profile'}
-                  color={appTheme.NEW_PALLET}
-                  type="solid"
-                  onPress={() => setdisabledInput(false)}
-                  icon={
-                    <Feather
-                      name="edit"
-                      color="black"
-                      size={22}
-                      style={{ paddingHorizontal: 3 }}
-                    />
-                  }
-                  iconPosition="right"
-                  buttonStyle={{
-                    backgroundColor: appTheme.NEW_PALLET,
-                    borderRadius: 8,
-                  }}
-                  titleStyle={{ color: 'black' }}
-                  containerStyle={{ paddingTop: 10 }}
-                />
-                {/* <TouchableOpacity
-                style={{
-                  width: '70%',
-                  padding: 10,
-                  flexDirection: 'row',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  borderRadius: responsiveWidth(2),
-                  backgroundColor: colors.black,
-                }}>
-                <Text
-                  style={{
-                    fontSize: responsiveFontSize(1.4),
-                    color: colors.white,
-                  }}>
-                  Edit Profile
+              <View style={pStyles.summaryActions}>
+                <Pressable
+                  onPress={() => setdisabledInput(!disabledInput)}
+                  style={({ pressed }) => [
+                    pStyles.actionButton,
+                    pStyles.actionPrimary,
+                    pressed && { opacity: 0.8 },
+                  ]}>
+                  <Feather
+                    name={disabledInput ? 'edit-2' : 'x'}
+                    size={15}
+                    color={appTheme.DARK_BOTTOMTAB}
+                  />
+                  <Text style={pStyles.actionPrimaryText}>
+                    {disabledInput ? 'Edit Profile' : 'Stop Editing'}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={updateLocationNow}
+                  disabled={updatingLocation}
+                  style={({ pressed }) => [
+                    pStyles.actionButton,
+                    pStyles.actionSecondary,
+                    (pressed || updatingLocation) && { opacity: 0.8 },
+                  ]}>
+                  {updatingLocation ? (
+                    <ActivityIndicator size="small" color="white" />
+                  ) : (
+                    <MaterialCommunityIcons name="map-marker-radius" size={16} color="white" />
+                  )}
+                  <Text style={pStyles.actionSecondaryText} numberOfLines={1}>
+                    {updatingLocation ? 'Detecting…' : `${t('updatelocation')}`}
+                  </Text>
+                </Pressable>
+              </View>
+            </LinearGradient>
+
+            {!disabledInput ? (
+              <View style={pStyles.editBanner}>
+                <Ionicons name="create-outline" size={16} color="#8A6100" />
+                <Text style={pStyles.editBannerText}>
+                  Editing is on. Tap the photo to change it, then press Submit to save.
                 </Text>
-                <View style={{width: responsiveWidth(3.5)}}></View>
-                <Image
-                  style={{width: 10, height: 10}}
-                  source={imagePath.EDIT}
-                />
-              </TouchableOpacity> */}
               </View>
-            </View>
-            <BRNE
-              title={`${t('updatelocation')}`}
-              color={appTheme.NEW_PALLET}
-              type="solid"
-              onPress={() =>
-                navigation.navigate(navigationStrings.UPDATE_LOCATION)
-              }
-              icon={
-                <MaterialCommunityIcons
-                  name="map-marker-radius"
-                  color="black"
-                  size={18}
-                  style={{ paddingRight: 6 }}
-                />
-              }
-              iconPosition="left"
-              buttonStyle={{
-                backgroundColor: appTheme.NEW_PALLET,
-                borderRadius: 8,
-                paddingVertical: 8,
-                paddingHorizontal: 14,
-              }}
-              titleStyle={{
-                color: 'black',
-                fontSize: responsiveFontSize(1.6),
-              }}
-              titleProps={{ numberOfLines: 1 }}
-              containerStyle={{
-                alignSelf: 'flex-end',
-                marginTop: responsiveHeight(1.5),
-                marginHorizontal: responsiveWidth(4),
-              }}
-            />
-            <View
-              style={{
-                marginTop: responsiveHeight(3),
-              }}>
-              <DashedLine
-                dashGap={7}
-                dashLength={4}
-                dashThickness={1}
-                dashColor="#ccc"
-              />
-            </View>
-            <View style={{ paddingHorizontal: 10 }}>
-              <View style={{ marginHorizontal: 10 }}>
-                <View style={styles.textContainer}>
-                  <Text style={styles.text}>Customer type</Text>
+            ) : null}
+
+            {/* KYC summary - opens the KYC Details screen */}
+            <Pressable
+              onPress={() => (navigation as any).push(navigationStrings.PROFILE, { section: 'kyc' })}
+              style={({ pressed }) => [pStyles.kycCard, pressed && { opacity: 0.9 }]}>
+              <View style={pStyles.kycCardTop}>
+                <View style={pStyles.kycIntroIcon}>
+                  <FontAwesome name="id-card" size={18} color={appTheme.DARK_BOTTOMTAB} />
                 </View>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={pStyles.kycIntroTitle}>KYC Details</Text>
+                  <Text style={pStyles.kycIntroText}>
+                    {kycItems.filter(k => k.state === 'verified').length} of {kycItems.length} verified
+                  </Text>
+                </View>
+                <View style={pStyles.kycCta}>
+                  <Text style={pStyles.kycCtaText}>
+                    {kycItems.every(k => k.state === 'verified') ? 'View' : 'Complete KYC'}
+                  </Text>
+                  <Ionicons name="chevron-forward" size={14} color={appTheme.DARK_BOTTOMTAB} />
+                </View>
+              </View>
+              <View style={pStyles.kycProgressTrack}>
                 <View
                   style={[
-                    styles.inputBox,
-                    { borderColor: 'rgba(0,0,0,0.08)', marginVertical: 10 },
-                  ]}>
-                  <TextInput
-                    style={styles.innerBox}
-                    autoCapitalize="none"
-                    editable={false}
-                    placeholderTextColor={'grey'}
-                    // keyboardType='number-pad'
-                    //   maxLength={12}
-                    value={ggNumber}
-                    onChangeText={text => { }}
-                    // onBlur={handleBlur('aadharNo')}
-                    placeholder={`Customer type`}
-                  />
-                </View>
-              </View>
-
-              <Input
-                containerStyle={styles.textInputContainer}
-                inputContainerStyle={styles.textInputContainer1}
-                renderErrorMessage={false}
-                value={verifiedFormik?.values?.firmName}
-                disabled={disabledInput}
-                label={`${t('shopname')}`}
-                onChangeText={(text: string) => {
-                  verifiedFormik.setFieldValue('firmName', text);
-                }}
-                labelStyle={styles.textInputLabel}
-              />
-
-              <Input
-                containerStyle={styles.textInputContainer}
-                inputContainerStyle={styles.textInputContainer1}
-                renderErrorMessage={false}
-                value={verifiedFormik?.values?.contactPerson}
-                disabled={disabledInput}
-                label={`${t('name')}`}
-                onChangeText={(text: string) => {
-                  verifiedFormik.setFieldValue('contactPerson', text);
-                }}
-                labelStyle={styles.textInputLabel}
-              />
-
-              <Input
-                containerStyle={styles.textInputContainer}
-                inputContainerStyle={styles.textInputContainer1}
-                renderErrorMessage={false}
-                value={verifiedFormik.values.mobile?.toString()}
-                disabled={true}
-                label={`${t('phoneno')}`}
-                onChangeText={(text: string) => {
-                  verifiedFormik.setFieldValue('mobile', parseInt(text));
-                }}
-                labelStyle={styles.textInputLabel}
-              />
-
-              <Input
-                containerStyle={styles.textInputContainer}
-                inputContainerStyle={styles.textInputContainer1}
-                renderErrorMessage={false}
-                value={verifiedFormik?.values?.address}
-                onChangeText={(text: string) => {
-                  verifiedFormik.setFieldValue('address', text);
-                  // formik.setFieldValue()
-                }}
-                label={`${t('address')}`}
-                labelStyle={styles.textInputLabel}
-                disabled={disabledInput}
-              />
-              {verifiedFormik.errors.address && (
-                <Text style={{ paddingLeft: 10, fontSize: 11, color: 'red' }}>
-                  {verifiedFormik.errors.address}
-                </Text>
-              )}
-
-              <Input
-                containerStyle={styles.textInputContainer}
-                inputContainerStyle={styles.textInputContainer1}
-                maxLength={6}
-                renderErrorMessage={false}
-                value={verifiedFormik?.values?.postalCode}
-                onChangeText={(text: string) => {
-                  verifiedFormik.setFieldValue('postalCode', text);
-                  if (text.length == 6) {
-                    console.log(text, 'oooododoodo')
-                    searchPostCodeArea(text)
-                  }
-                  // formik.setFieldValue()
-                }}
-                disabled={disabledInput}
-                keyboardType="numeric"
-                label={`${t('postalcode')}`}
-                labelStyle={styles.textInputLabel}
-              />
-              {verifiedFormik.errors.postalCode && (
-                <Text style={{ paddingLeft: 10, fontSize: 11, color: 'red' }}>
-                  {verifiedFormik.errors.postalCode}
-                </Text>
-              )}
-
-              <Text
-                style={styles.labelStateCity}>
-                {`${t('select')} ${t('state')}`}
-              </Text>
-              <View
-                style={styles.stateCityContainer}>
-                <Dropdown
-                  data={stateData}
-                  style={styles.stateCityDropdownWrapper}
-                  search={true}
-                  containerStyle={{ borderRadius: 8 }}
-                  dropdownPosition={'top'}
-                  selectedTextStyle={{ color: disabledInput ? 'grey' : 'black' }}
-                  disable={disabledInput}
-                  selectedTextProps={{ selectionColor: 'black' }}
-                  itemTextStyle={{ paddingLeft: 10 }}
-                  inputSearchStyle={{
-                    height: 40,
-                  }}
-                  maxHeight={300}
-                  labelField="label"
-                  valueField="value"
-                  placeholder={`${t('select')} ${t('state')}`}
-                  searchPlaceholder="Search..."
-                  value={verifiedFormik.values.state}
-                  onChange={(item: any) => {
-                    handleInputChange('state', item.value);
-                    setStateSelect(item?.value);
-                  }}
+                    pStyles.kycProgressFill,
+                    {
+                      width: `${(kycItems.filter(k => k.state === 'verified').length / kycItems.length) * 100}%`,
+                    },
+                  ]}
                 />
               </View>
-              {verifiedFormik.errors.state && (
-                <Text style={{ paddingLeft: 10, fontSize: 11, color: 'red' }}>
-                  {verifiedFormik.errors.state}
-                </Text>
-              )}
-
-              <Text
-                style={styles.labelStateCity}>
-                {`${t('select')} ${t('city')}`}
-              </Text>
-              <View
-                style={styles.stateCityContainer}>
-                <Dropdown
-                  style={styles.stateCityDropdownWrapper}
-                  selectedTextStyle={{ color: disabledInput ? 'grey' : 'black' }}
-                  disable={disabledInput}
-                  containerStyle={{ borderRadius: 8 }}
-                  selectedTextProps={{ selectionColor: 'black' }}
-                  itemTextStyle={{ paddingLeft: 10 }}
-                  inputSearchStyle={{
-                    height: 40,
-                  }}
-                  dropdownPosition={'top'}
-                  showsVerticalScrollIndicator={true}
-                  search={true}
-                  data={cityData}
-                  labelField="label"
-                  valueField="value"
-                  placeholder={`${t('select')} ${t('city')}`}
-                  searchPlaceholder="Search City"
-                  value={verifiedFormik.values.city}
-                  onChange={(item: any) => {
-                    handleInputChange('city', item.value);
-                  }}
-                />
-              </View>
-              {verifiedFormik.errors?.city && (
-                <Text style={{ paddingLeft: 10, fontSize: 11, color: 'red' }}>
-                  {verifiedFormik.errors?.city}
-                </Text>
-              )}
-            </View>
-
-            {!disabledInput ?
-              <View style={{ paddingHorizontal: 10, marginHorizontal: 10, marginTop: 13 }}>
-                <View style={styles.textContainer}>
-                  <Text style={{ fontSize: 14, color: '#000000' }}>{conditonalAPI.avatar ? 'Update Profile Image' : 'Upload Profile Image'}</Text>
-                </View>
-                <View
-                  style={styles.profileImageBoxWrapper}>
-                  {verifiedFormik?.values['avatar'] ? (
-                    <ImageRNE
-                      style={styles.boxImage}
-                      source={{
-                        uri: conditonalAPI.avatar
-                          ? `${imagePath.IMAGE_URL}${verifiedFormik.values['avatar']}`
-                          : `${verifiedFormik.values['avatar']}`,
-                        cache: 'reload',
-                      }}
-                    />
-                  ) : null}
+              <View style={pStyles.kycChips}>
+                {kycItems.map(k => (
                   <View
-                    style={styles.boxImageUploadButton}>
-                    <View style={{ flexDirection: 'row' }}>
-                      <Button
-                        title={'Upload'}
-                        titleStyle={{ color: 'black' }}
-                        onPress={toggleDialogAvatar}
-                        color={'#FFE7C7'}
-                        containerStyle={{
-                          borderRadius: 18,
-                          // borderTopRightRadius: 18,
-                          // borderBottomRightRadius: 18,
-                          padding: 3,
-                        }}
-                        iconPosition="right"
-                        icon={
-                          <Ionicons
-                            name="cloud-upload"
-                            size={20}
-                            // color={'#585858'}
-                            color={'black'}
-                            style={{
-                              paddingHorizontal: 5,
-                              alignSelf: 'flex-end',
-                            }}
-                          />
-                        }
-                      />
-                    </View>
+                    key={k.key}
+                    style={[
+                      pStyles.kycChip,
+                      {
+                        backgroundColor:
+                          k.state === 'verified' ? '#E4F6EC' : k.state === 'pending' ? '#FFF1D2' : '#FDECEA',
+                      },
+                    ]}>
+                    <Ionicons
+                      name={k.state === 'verified' ? 'checkmark-circle' : k.state === 'pending' ? 'time' : 'alert-circle'}
+                      size={12}
+                      color={k.state === 'verified' ? '#1E9E5A' : k.state === 'pending' ? '#B7791F' : '#D93025'}
+                    />
+                    <Text
+                      style={[
+                        pStyles.kycChipText,
+                        {
+                          color: k.state === 'verified' ? '#1E9E5A' : k.state === 'pending' ? '#B7791F' : '#D93025',
+                        },
+                      ]}>
+                      {k.label}
+                    </Text>
                   </View>
-                </View>
+                ))}
               </View>
-              : null}
+            </Pressable>
 
-
-            <Text
-              style={styles.shopLabelText}>
-              <Text style={{ fontSize: 14, color: 'black' }}>{'Shop Image'}</Text>
-              <Text style={{ color: 'red' }}>*</Text>
-            </Text>
-            <View
-              style={styles.boxWrapper}>
-              <View
-                style={styles.boxCrossIcon}>
-                <Ionicons
-                  name="close-circle-outline"
-                  size={25}
-                  color={'red'}
-                  onPress={() => {
-                    verifiedFormik.setFieldValue('shopimage', '');
-                    // setShop(null);
-                    // setAadharFileURIBack(null);
-                  }}
-                />
-              </View>
-              {verifiedFormik.values['shopimage'] ? (
-                <ImageRNE
-                  style={styles.boxImage}
-                  onPress={() => setShowShopImg(true)}
-                  source={{
-                    uri: conditonalAPI.shopimage
-                      ? `${imagePath.IMAGE_URL}${verifiedFormik.values['shopimage']}`
-                      : `${verifiedFormik.values['shopimage']}`,
-                    cache: 'reload',
-                  }}
-                />
-              ) : null}
-              <View
-                style={styles.boxImageUploadButton}>
-                <View style={{ flexDirection: 'row' }}>
-                  <Button
-                    title={'Upload'}
-                    titleStyle={{ color: 'black' }}
-                    onPress={toggleDialogShop}
-                    color={'#FFE7C7'}
-                    containerStyle={{
-                      borderRadius: 18,
-                      // borderTopRightRadius: 18,
-                      // borderBottomRightRadius: 18,
-                      padding: 3,
-                    }}
-                    iconPosition="right"
-                    icon={
-                      <Ionicons
-                        name="cloud-upload-sharp"
-                        size={20}
-                        // color={'#585858'}
-                        color={'black'}
-                        style={{
-                          paddingHorizontal: 5,
-                          alignSelf: 'flex-end',
-                        }}
-                      />
-                    }
-                  />
-                </View>
-              </View>
-              {showShopImg ? (
-                <Modal animationType="slide" transparent={true}>
-                  <Dialog
-                    overlayStyle={{ borderRadius: 20 }}
-                    isVisible={showShopImg}
-                    onBackdropPress={() => setShowShopImg(!showShopImg)}>
-                    <View
-                      style={styles.modalView}>
-                      <Image
-                        style={styles.modalImage}
-                        source={{
-                          uri: conditonalAPI.shopimage
-                            ? `${imagePath.IMAGE_URL}${verifiedFormik.values['shopimage']}`
-                            : `${verifiedFormik.values['shopimage']}`,
-                          cache: 'reload',
-                        }}></Image>
-                    </View>
-                  </Dialog>
-                </Modal>
-              ) : null}
-              <View style={{ padding: 1 }}></View>
+            {/* Personal details */}
+            <View style={kycStyles.card}>
+              <KycCardHeader icon="person-outline" title="Personal Details" />
+              <KycField
+                label="Customer Type"
+                icon="pricetag-outline"
+                locked
+                value={ggNumber || ''}
+                placeholder="Customer type"
+              />
+              <KycField
+                label={`${t('shopname')}`}
+                icon="storefront-outline"
+                locked={disabledInput}
+                value={verifiedFormik?.values?.firmName || ''}
+                onChangeText={(text: string) => verifiedFormik.setFieldValue('firmName', text)}
+                placeholder="Enter shop name"
+              />
+              <KycField
+                label={`${t('name')}`}
+                icon="person-outline"
+                locked={disabledInput}
+                value={verifiedFormik?.values?.contactPerson || ''}
+                onChangeText={(text: string) => verifiedFormik.setFieldValue('contactPerson', text)}
+                placeholder="Enter your name"
+              />
+              <KycField
+                label="Buyer Name (Optional)"
+                icon="cart-outline"
+                locked={disabledInput}
+                value={verifiedFormik?.values?.buyerName || ''}
+                onChangeText={(text: string) => verifiedFormik.setFieldValue('buyerName', text)}
+                autoCapitalize="words"
+                maxLength={60}
+                placeholder="Person who buys stock for the shop"
+              />
+              <KycField
+                label={`${t('phoneno')}`}
+                icon="call-outline"
+                locked
+                value={verifiedFormik.values.mobile?.toString() || ''}
+                helper="Registered mobile number can't be changed"
+              />
             </View>
-            {verifiedFormik.errors.shopimage && (
-              <Text style={{ fontSize: 11, color: 'red', paddingLeft: 20 }}>
-                {verifiedFormik.errors.shopimage}
-              </Text>
-            )}
-          </View>
 
-          <View
-            style={{
-              flexDirection: 'row',
-              alignContent: 'center',
-              alignItems: 'center',
-              paddingTop: 10,
-              justifyContent: 'space-evenly',
-            }}>
-            <View
-              style={{
-                borderBottomColor: 'black',
-                borderBottomWidth: StyleSheet.hairlineWidth,
-                width: width / 2 - 80,
-                borderWidth: 0.7,
-                borderColor: 'black',
-              }}
-            />
-            <Text style={{ color: 'black', fontSize: 16, margin: 5 }}>
-              KYC Details
-            </Text>
-            <FontAwesome name="id-card" size={20} color={'black'} />
-            <View
-              style={{
-                borderBottomColor: 'black',
-                borderBottomWidth: StyleSheet.hairlineWidth,
-                width: width / 2 - 80,
-                borderWidth: 0.7,
-                borderColor: 'black',
-              }}
-            />
-          </View>
-
-
-          <View
-            style={{
-              padding: 10,
-              paddingLeft: 20,
-              justifyContent: 'flex-start',
-              flexDirection: 'row',
-            }}>
-            <Text style={{ fontSize: 14, paddingRight: 10, color: 'black' }}>
-              <Text style={{ fontSize: 14, color: 'black' }}>
-                {t('aadharcardfront')}
-              </Text>
-              <Text style={{ color: 'red' }}>*</Text>
-            </Text>
-            {verificationDB.aadharVerified === true ? (
-              <View
-                style={styles.verifiedView}>
-                <Ionicons
-                  name="checkmark-circle"
-                  color={'green'}
-                  size={15}
-                  style={{ paddingLeft: 10 }}
-                />
-                <Text
-                  style={styles.verifiedText}>
-                  {t('verified')}
-                </Text>
-              </View>
-            ) : (
-              <View
-                style={styles.notVerifiedView}>
-                <Ionicons
-                  name="close-circle"
-                  color={'red'}
-                  size={15}
-                  style={{ paddingLeft: 10 }}
-                />
-                <Text
-                  style={styles.notVerifiedText}>
-                  {t('notverified')}
-                </Text>
-              </View>
-            )}
-          </View>
-
-          <View
-            style={styles.boxWrapper}>
-            {verificationDB.aadharVerified != true ?
-              <View
-                style={styles.boxCrossIcon}>
-                <Ionicons
-                  name="close-circle-outline"
-                  size={25}
-                  color={'red'}
-                  onPress={() => {
-                    verifiedFormik.setFieldValue('aadharFrontImage', '');
-                    setAadharFileFront(null);
-                    setAadharFileURIFront(null);
-                  }}
-                />
-              </View>
-              : null}
-
-            {
-              verifiedFormik.values['aadharFrontImage'] ? (
-                <ImageRNE
-                  style={styles.boxImage}
-                  onPress={() => setShowAadharFront(true)}
-                  source={{
-                    uri: conditonalAPI.aadharFrontImage
-                      ? `${imagePath.IMAGE_URL}${verifiedFormik.values['aadharFrontImage']}`
-                      : `${verifiedFormik.values['aadharFrontImage']}`,
-                    cache: 'reload',
-                  }}
-                />
-              ) : null
-            }
-
-            {verificationDB.aadharVerified != true ?
-              <View
-                style={styles.boxImageUploadButton}>
-                <View style={{ flexDirection: 'row' }}>
-                  {/* <Button
-                onPress={() => newcrop()}
-                color={'#FFE7C7'}
-                containerStyle={{
-                  borderTopLeftRadius: 18,
-                  borderBottomLeftRadius: 18,
-                  padding: 3,
+            {/* Address */}
+            <View style={kycStyles.card}>
+              <KycCardHeader icon="location-outline" title="Shop Address" />
+              <KycField
+                label={`${t('address')}`}
+                icon="home-outline"
+                locked={disabledInput}
+                value={verifiedFormik?.values?.address || ''}
+                onChangeText={(text: string) => verifiedFormik.setFieldValue('address', text)}
+                placeholder="House / shop no., street, area"
+                error={verifiedFormik.errors.address}
+              />
+              <KycField
+                label={`${t('postalcode')}`}
+                icon="mail-outline"
+                locked={disabledInput}
+                value={verifiedFormik?.values?.postalCode || ''}
+                onChangeText={(text: string) => {
+                  const digits = text.replace(/[^0-9]/g, '');
+                  verifiedFormik.setFieldValue('postalCode', digits);
+                  if (digits.length == 6) {
+                    searchPostCodeArea(digits);
+                  }
                 }}
-                icon={
-                  <Icon
-                    name="camera"
-                    size={25}
-                    color={'#585858'}
-                    style={{
-                      alignSelf: 'flex-end',
-                    }}
-                  />
-                }
-              /> */}
-                  <Button
-                    title={'Upload'}
-                    titleStyle={{ color: 'black' }}
-                    // onPress={() => openGalleryAadharFront()}
-                    onPress={toggleDialogAF}
-                    disabled={verificationDB.aadharVerified}
-                    color={'#FFE7C7'}
-                    containerStyle={{
-                      borderRadius: 18,
-                      // borderTopRightRadius: 18,
-                      // borderBottomRightRadius: 18,
-                      padding: 3,
-                    }}
-                    iconPosition="right"
-                    icon={
-                      <Ionicons
-                        name="cloud-upload-sharp"
-                        size={20}
-                        // color={'#585858'}
-                        color={'black'}
-                        style={{
-                          paddingHorizontal: 5,
-                          alignSelf: 'flex-end',
-                        }}
-                      />
-                    }
-                  />
-                </View>
-              </View> : null}
+                keyboardType="number-pad"
+                maxLength={6}
+                placeholder="6-digit PIN code"
+                error={verifiedFormik.errors.postalCode}
+              />
 
-            <View style={{ padding: 1 }}></View>
+              <Text style={pStyles.fieldLabel}>{`${t('state')}`}</Text>
+              <Dropdown
+                data={stateData}
+                style={[pStyles.dropdown, disabledInput && pStyles.dropdownLocked]}
+                search={true}
+                containerStyle={{ borderRadius: 10 }}
+                dropdownPosition={'top'}
+                selectedTextStyle={pStyles.dropdownText}
+                placeholderStyle={pStyles.dropdownPlaceholder}
+                disable={disabledInput}
+                itemTextStyle={{ paddingLeft: 10 }}
+                inputSearchStyle={{ height: 40, borderRadius: 8 }}
+                maxHeight={300}
+                labelField="label"
+                valueField="value"
+                placeholder={`${t('select')} ${t('state')}`}
+                searchPlaceholder="Search..."
+                value={verifiedFormik.values.state}
+                renderLeftIcon={() => (
+                  <Ionicons name="map-outline" size={18} color="#6B6B6B" style={{ marginRight: 8 }} />
+                )}
+                onChange={(item: any) => {
+                  handleInputChange('state', item.value);
+                  setStateSelect(item?.value);
+                }}
+              />
+              {verifiedFormik.errors.state ? (
+                <Text style={pStyles.errorText}>{verifiedFormik.errors.state}</Text>
+              ) : null}
+
+              <Text style={pStyles.fieldLabel}>{`${t('city')}`}</Text>
+              <Dropdown
+                style={[pStyles.dropdown, disabledInput && pStyles.dropdownLocked]}
+                selectedTextStyle={pStyles.dropdownText}
+                placeholderStyle={pStyles.dropdownPlaceholder}
+                disable={disabledInput}
+                containerStyle={{ borderRadius: 10 }}
+                itemTextStyle={{ paddingLeft: 10 }}
+                inputSearchStyle={{ height: 40, borderRadius: 8 }}
+                dropdownPosition={'top'}
+                showsVerticalScrollIndicator={true}
+                search={true}
+                data={cityData}
+                labelField="label"
+                valueField="value"
+                placeholder={`${t('select')} ${t('city')}`}
+                searchPlaceholder="Search City"
+                value={verifiedFormik.values.city}
+                renderLeftIcon={() => (
+                  <Ionicons name="business-outline" size={18} color="#6B6B6B" style={{ marginRight: 8 }} />
+                )}
+                onChange={(item: any) => {
+                  handleInputChange('city', item.value);
+                }}
+              />
+              {verifiedFormik.errors?.city ? (
+                <Text style={pStyles.errorText}>{verifiedFormik.errors?.city}</Text>
+              ) : null}
+            </View>
+
+
+            <ShopImageCard
+              imageUri={
+                verifiedFormik.values['shopimage']
+                  ? conditonalAPI.shopimage
+                    ? `${imagePath.IMAGE_URL}${verifiedFormik.values['shopimage']}`
+                    : `${verifiedFormik.values['shopimage']}`
+                  : null
+              }
+              error={verifiedFormik.errors.shopimage}
+              onPick={toggleDialogShop}
+              onRemove={() => {
+                verifiedFormik.setFieldValue('shopimage', '');
+                // Clear the pending upload too, or the removed photo is still sent.
+                setShopObject(null);
+              }}
+              onPreview={() => setShowShopImg(true)}
+            />
+            {showShopImg ? (
+              <Modal animationType="slide" transparent={true}>
+                <Dialog
+                  overlayStyle={{ borderRadius: 20 }}
+                  isVisible={showShopImg}
+                  onBackdropPress={() => setShowShopImg(!showShopImg)}>
+                  <View
+                    style={styles.modalView}>
+                    <Image
+                      style={styles.modalImage}
+                      source={{
+                        uri: conditonalAPI.shopimage
+                          ? `${imagePath.IMAGE_URL}${verifiedFormik.values['shopimage']}`
+                          : `${verifiedFormik.values['shopimage']}`,
+                        cache: 'reload',
+                      }}></Image>
+                  </View>
+                </Dialog>
+              </Modal>
+            ) : null}
+            </>)}
           </View>
+
+          {isKycSection && (<>
+
+
+          <AadhaarKycCard
+            verified={verificationDB.aadharVerified === true}
+            frontUri={
+              verifiedFormik.values['aadharFrontImage']
+                ? conditonalAPI.aadharFrontImage
+                  ? `${imagePath.IMAGE_URL}${verifiedFormik.values['aadharFrontImage']}`
+                  : `${verifiedFormik.values['aadharFrontImage']}`
+                : null
+            }
+            backUri={
+              verifiedFormik.values['aadharBackImage']
+                ? conditonalAPI.aadharBackImage
+                  ? `${imagePath.IMAGE_URL}${verifiedFormik.values['aadharBackImage']}`
+                  : `${verifiedFormik.values['aadharBackImage']}`
+                : null
+            }
+            frontError={verifiedFormik.errors.aadharFrontImage}
+            backError={verifiedFormik.errors.aadharBackImage}
+            onPickFront={toggleDialogAF}
+            onPickBack={toggleDialogAB}
+            onRemoveFront={() => {
+              verifiedFormik.setFieldValue('aadharFrontImage', '');
+              setAaharFrontObject(null);
+              setAadharFileFront(null);
+              setAadharFileURIFront(null);
+            }}
+            onRemoveBack={() => {
+              verifiedFormik.setFieldValue('aadharBackImage', '');
+              setAaharBackObject(null);
+            }}
+            onPreviewFront={() => setShowAadharFront(true)}
+            onPreviewBack={() => setShowAadharBack(true)}
+            aadhaarNumber={verifiedFormik.values['aadharNo']}
+            // Don't nag while typing: show the error once all 12 digits are in
+            // or the user leaves the field.
+            aadhaarNumberError={
+              verifiedFormik.touched.aadharNo ||
+                normalizeAadhaar(verifiedFormik.values['aadharNo'] || '').length === 12
+                ? verifiedFormik.errors.aadharNo
+                : null
+            }
+            onChangeAadhaarNumber={(digits: string) => {
+              verifiedFormik.setFieldValue('aadharNo', digits);
+            }}
+            onBlurAadhaarNumber={() => verifiedFormik.setFieldTouched('aadharNo', true)}
+          />
           {showAadharFront ? (
             <Modal animationType="slide" transparent={true}>
               <Dialog
@@ -1696,142 +1667,6 @@ const Profile = (props: any) => {
               </Dialog>
             </Modal>
           ) : null}
-          {verifiedFormik.errors.aadharFrontImage && (
-            <Text style={{ fontSize: 11, color: 'red', paddingLeft: 20 }}>
-              {verifiedFormik.errors.aadharFrontImage}
-            </Text>
-          )}
-
-
-          <View
-            style={{
-              padding: 10,
-              paddingLeft: 20,
-              justifyContent: 'flex-start',
-              flexDirection: 'row',
-            }}>
-            <Text style={{ fontSize: 14, paddingRight: 10, color: 'black' }}>
-              <Text style={{ fontSize: 14, color: 'black' }}>
-                {' '}
-                {t('aadharcardback')}
-              </Text>
-              <Text style={{ color: 'red' }}>*</Text>
-            </Text>
-            {verificationDB.aadharVerified === true ? (
-              <View
-                style={styles.verifiedView}>
-                <Ionicons
-                  name="checkmark-circle"
-                  color={'green'}
-                  size={15}
-                  style={{ paddingLeft: 10 }}
-                />
-                <Text
-                  style={styles.verifiedText}>
-                  {t('verified')}
-                </Text>
-              </View>
-            ) : (
-              <View
-                style={styles.notVerifiedView}>
-                <Ionicons
-                  name="close-circle"
-                  color={'red'}
-                  size={15}
-                  style={{ paddingLeft: 10 }}
-                />
-                <Text
-                  style={styles.notVerifiedText}>
-                  {t('notverified')}
-                </Text>
-              </View>
-            )}
-          </View>
-          <View
-            style={styles.boxWrapper}>
-            {verificationDB.aadharVerified != true ?
-              <View
-                style={styles.boxCrossIcon}>
-                <Ionicons
-                  name="close-circle-outline"
-                  size={25}
-                  color={'red'}
-                  onPress={() => {
-                    verifiedFormik.setFieldValue('aadharBackImage', '');
-                    // setAadharFileBack(null);
-                    // setAadharFileURIBack(null);
-                  }}
-                />
-              </View>
-              : null}
-
-            {verifiedFormik.values['aadharBackImage'] ? (
-              <ImageRNE
-                style={styles.boxImage}
-                onPress={() => setShowAadharBack(true)}
-                source={{
-                  uri: conditonalAPI.aadharBackImage
-                    ? `${imagePath.IMAGE_URL}${verifiedFormik.values['aadharBackImage']}`
-                    : `${verifiedFormik.values['aadharBackImage']}`,
-                  cache: 'reload',
-                }}
-              />
-            ) : null}
-
-            {verificationDB.aadharVerified != true ?
-              <View
-                style={styles.boxImageUploadButton}>
-                <View style={{ flexDirection: 'row' }}>
-                  {/* <Button
-                onPress={() => openCameraAadharBack()}
-                color={'#FFE7C7'}
-                containerStyle={{
-                  borderTopLeftRadius: 18,
-                  borderBottomLeftRadius: 18,
-                  padding: 3,
-                }}
-                icon={
-                  <Icon
-                    name="camera"
-                    size={25}
-                    color={'#585858'}
-                    style={{
-                      alignSelf: 'flex-end',
-                    }}
-                  />
-                }
-              /> */}
-                  <Button
-                    title={'Upload'}
-                    titleStyle={{ color: 'black' }}
-                    onPress={toggleDialogAB}
-                    color={'#FFE7C7'}
-                    disabled={verificationDB.aadharVerified}
-                    containerStyle={{
-                      borderRadius: 18,
-                      // borderTopRightRadius: 18,
-                      // borderBottomRightRadius: 18,
-                      padding: 3,
-                    }}
-                    iconPosition="right"
-                    icon={
-                      <Ionicons
-                        name="cloud-upload-sharp"
-                        size={20}
-                        // color={'#585858'}
-                        color={'black'}
-                        style={{
-                          paddingHorizontal: 5,
-                          alignSelf: 'flex-end',
-                        }}
-                      />
-                    }
-                  />
-                </View>
-              </View> : null}
-
-            <View style={{ padding: 1 }}></View>
-          </View>
           {showAadharBack ? (
             <Modal animationType="slide" transparent={true}>
               <Dialog
@@ -1852,149 +1687,37 @@ const Profile = (props: any) => {
               </Dialog>
             </Modal>
           ) : null}
-          {verifiedFormik.errors.aadharBackImage && (
-            <Text style={{ fontSize: 11, color: 'red', paddingLeft: 20 }}>
-              {verifiedFormik.errors.aadharBackImage}
-            </Text>
-          )}
 
-          {/* Paste here */}
-          <View
-            style={{
-              padding: 10,
-              paddingLeft: 20,
-              justifyContent: 'flex-start',
-              flexDirection: 'row',
-            }}>
-            <Text style={{ fontSize: 14, paddingRight: 10, color: 'black' }}>
-              <Text style={{ fontSize: 14, color: 'black' }}>
-                {t('pass_cheque')}
-              </Text>
-              {/* <Text style={{ color: 'red' }}>*</Text> */}
-            </Text>
-            {verificationDB.bankVerified === true ? (
-              <View
-                style={styles.verifiedView}>
-                <Ionicons
-                  name="checkmark-circle"
-                  color={'green'}
-                  size={15}
-                  style={{ paddingLeft: 10 }}
-                />
-                <Text
-                  style={styles.verifiedText}>
-                  {t('verified')}
-                </Text>
-              </View>
-            ) : (
-              <View
-                style={styles.notVerifiedView}>
-                <Ionicons
-                  name="close-circle"
-                  color={'red'}
-                  size={15}
-                  style={{ paddingLeft: 10 }}
-                />
-                <Text
-                  style={styles.notVerifiedText}>
-                  {t('notverified')}
-                </Text>
-              </View>
-            )}
-          </View>
-          <View
-            style={styles.boxWrapper}>
-            {verificationDB.bankVerified != true ?
-              <View
-                style={styles.boxCrossIcon}>
-                <Ionicons
-                  name="close-circle-outline"
-                  size={25}
-                  color={'red'}
-                  onPress={() => {
-                    verifiedFormik.setFieldValue('passbookImage', '');
-                    setpassbookFile(null);
-                    setpassbookFileURI(null);
-                  }}
-                />
-              </View>
-              : null}
-
-            {
-              verifiedFormik.values['passbookImage'] ? (
-                <ImageRNE
-                  style={styles.boxImage}
-                  onPress={() => setshowPassbook(true)}
-                  source={{
-                    uri: conditonalAPI.passbookImage
-                      ? `${imagePath.IMAGE_URL}${verifiedFormik.values['passbookImage']}`
-                      : `${verifiedFormik.values['passbookImage']}`,
-                    cache: 'reload',
-                  }}
-                />
-              ) : null
-              // <Ionicons
-              //   name="images"
-              //   size={46}
-              //   style={{paddingLeft: 10}}
-              //   color={'#585858'}
-              // />
+          <PassbookBankCard
+            passbookVerified={verificationDB.bankVerified === true}
+            passbookUri={
+              verifiedFormik.values['passbookImage']
+                ? conditonalAPI.passbookImage
+                  ? `${imagePath.IMAGE_URL}${verifiedFormik.values['passbookImage']}`
+                  : `${verifiedFormik.values['passbookImage']}`
+                : null
             }
-
-            {verificationDB.bankVerified != true ?
-              <View
-                style={styles.boxImageUploadButton}>
-                <View style={{ flexDirection: 'row' }}>
-                  {/* <Button
-                onPress={() => openCameraPassbook()}
-                color={'#FFE7C7'}
-                containerStyle={{
-                  borderTopLeftRadius: 18,
-                  borderBottomLeftRadius: 18,
-                  padding: 3,
-                }}
-                icon={
-                  <Icon
-                    name="camera"
-                    size={25}
-                    color={'#585858'}
-                    style={{
-                      alignSelf: 'flex-end',
-                    }}
-                  />
-                }
-              /> */}
-                  <Button
-                    title={'Upload'}
-                    titleStyle={{ color: 'black' }}
-                    onPress={toggleDialogP}
-                    color={'#FFE7C7'}
-                    disabled={verificationDB.bankVerified}
-                    containerStyle={{
-                      borderRadius: 18,
-                      // borderTopRightRadius: 18,
-                      // borderBottomRightRadius: 18,
-                      padding: 3,
-                    }}
-                    iconPosition="right"
-                    icon={
-                      <Ionicons
-                        name="cloud-upload-sharp"
-                        size={20}
-                        // color={'#585858'}
-                        color={'black'}
-                        style={{
-                          paddingHorizontal: 5,
-                          alignSelf: 'flex-end',
-                        }}
-                      />
-                    }
-                  />
-                </View>
-              </View> : null}
-
-            <View style={{ padding: 1 }}></View>
-          </View>
+            passbookError={!upiIdNumber ? verifiedFormik.errors.passbookImage : null}
+            onPickPassbook={toggleDialogP}
+            onRemovePassbook={() => {
+              verifiedFormik.setFieldValue('passbookImage', '');
+              setPassbookObject(null);
+              setpassbookFile(null);
+              setpassbookFileURI(null);
+            }}
+            onPreviewPassbook={() => setshowPassbook(true)}
+            bankValues={verifiedFormik.values}
+            // Show a field's error once it's touched; a failed submit touches all.
+            bankErrors={Object.fromEntries(
+              BANK_FIELDS.map(field => [
+                field,
+                verifiedFormik.touched[field] ? verifiedFormik.errors[field] : null,
+              ]),
+            )}
+            bankLocked={dbKyc?.verified === true}
+            onChangeBank={(field, value) => verifiedFormik.setFieldValue(field, value)}
+            onBlurBank={field => verifiedFormik.setFieldTouched(field, true)}
+          />
           {showPassbook ? (
             <Modal animationType="slide" transparent={true}>
               <Dialog
@@ -2015,144 +1738,37 @@ const Profile = (props: any) => {
               </Dialog>
             </Modal>
           ) : null}
-          {(verifiedFormik.errors.passbookImage && !upiIdNumber) && (
-            <Text style={{ fontSize: 11, color: 'red', paddingLeft: 20 }}>
-              {verifiedFormik.errors.passbookImage}
-            </Text>
-          )}
 
 
-          <View
-            style={{
-              padding: 10,
-              paddingLeft: 20,
-              justifyContent: 'flex-start',
-              flexDirection: 'row',
-            }}>
-            <Text style={{ fontSize: 14, paddingRight: 10, color: 'black' }}>
-              {t('pancard')}
-            </Text>
-            {verificationDB.panVerified === true ? (
-              <View
-                style={styles.verifiedView}>
-                <Ionicons
-                  name="checkmark-circle"
-                  color={'green'}
-                  size={15}
-                  style={{ paddingLeft: 10 }}
-                />
-                <Text
-                  style={styles.verifiedText}>
-                  {t('verified')}
-                </Text>
-              </View>
-            ) : (
-              <View
-                style={styles.notVerifiedView}>
-                <Ionicons
-                  name="close-circle"
-                  color={'red'}
-                  size={15}
-                  style={{ paddingLeft: 10 }}
-                />
-                <Text
-                  style={styles.notVerifiedText}>
-                  {t('notverified')}
-                </Text>
-              </View>
-            )}
-          </View>
-          <View
-            style={styles.boxWrapper}>
-            {verificationDB.panVerified != true ?
-              <View
-                style={styles.boxCrossIcon}>
-                <Ionicons
-                  name="close-circle-outline"
-                  size={25}
-                  color={'red'}
-                  onPress={() => {
-                    verifiedFormik.setFieldValue('panImage', '');
-                    setPanFile(null);
-                    setPanFileURI(null);
-                  }}
-                />
-              </View>
-              : null}
-            {
-              verifiedFormik.values['panImage'] ? (
-                <ImageRNE
-                  style={styles.boxImage}
-                  onPress={() => setShowPan(true)}
-                  source={{
-                    uri: conditonalAPI.panImage
-                      ? `${imagePath.IMAGE_URL}${verifiedFormik.values['panImage']}`
-                      : `${verifiedFormik.values['panImage']}`,
-                    cache: 'reload',
-                  }}
-                />
-              ) : null
-              // <Ionicons
-              //   name="images"
-              //   size={46}
-              //   style={{paddingLeft: 10}}
-              //   color={'#585858'}
-              // />
+          <PanKycCard
+            verified={verificationDB.panVerified === true}
+            imageUri={
+              verifiedFormik.values['panImage']
+                ? conditonalAPI.panImage
+                  ? `${imagePath.IMAGE_URL}${verifiedFormik.values['panImage']}`
+                  : `${verifiedFormik.values['panImage']}`
+                : null
             }
-            {verificationDB.panVerified != true ?
-              <View
-                style={styles.boxImageUploadButton}>
-                <View style={{ flexDirection: 'row' }}>
-                  {/* <Button
-                onPress={() => openCameraPAN()}
-                color={'#FFE7C7'}
-                containerStyle={{
-                  borderTopLeftRadius: 18,
-                  borderBottomLeftRadius: 18,
-                  padding: 3,
-                }}
-                icon={
-                  <Icon
-                    name="camera"
-                    size={25}
-                    color={'#585858'}
-                    style={{
-                      alignSelf: 'flex-end',
-                    }}
-                  />
-                }
-              /> */}
-                  <Button
-                    title={'Upload'}
-                    titleStyle={{ color: 'black' }}
-                    onPress={toggleDialogPAN}
-                    disabled={verificationDB.panVerified}
-                    color={'#FFE7C7'}
-                    containerStyle={{
-                      borderRadius: 18,
-                      // borderTopRightRadius: 18,
-                      // borderBottomRightRadius: 18,
-                      padding: 3,
-                    }}
-                    iconPosition="right"
-                    icon={
-                      <Ionicons
-                        name="cloud-upload-sharp"
-                        size={20}
-                        // color={'#585858'}
-                        color={'black'}
-                        style={{
-                          paddingHorizontal: 5,
-                          alignSelf: 'flex-end',
-                        }}
-                      />
-                    }
-                  />
-                </View>
-              </View> : null}
-
-            <View style={{ padding: 1 }}></View>
-          </View>
+            imageError={verifiedFormik.errors.panImage}
+            onPickImage={toggleDialogPAN}
+            onRemoveImage={() => {
+              verifiedFormik.setFieldValue('panImage', '');
+              setPanObject(null);
+              setPanFile(null);
+              setPanFileURI(null);
+            }}
+            onPreviewImage={() => setShowPan(true)}
+            panNumber={verifiedFormik.values['panNo']}
+            // Show the error once the PAN is complete or the user leaves the field.
+            panNumberError={
+              verifiedFormik.touched.panNo ||
+                normalizePan(verifiedFormik.values['panNo'] || '').length === 10
+                ? verifiedFormik.errors.panNo
+                : null
+            }
+            onChangePanNumber={(pan: string) => verifiedFormik.setFieldValue('panNo', pan)}
+            onBlurPanNumber={() => verifiedFormik.setFieldTouched('panNo', true)}
+          />
           {showPAN ? (
             <Modal animationType="slide" transparent={true}>
               <Dialog
@@ -2173,220 +1789,58 @@ const Profile = (props: any) => {
               </Dialog>
             </Modal>
           ) : null}
-          {verifiedFormik.errors.panImage && (
-            <Text style={{ fontSize: 11, color: 'red', paddingLeft: 20 }}>
-              {verifiedFormik.errors.panImage}
-            </Text>
-          )}
 
-          {/* ----------NEW SECTION---------- */}
-          <View style={{ marginHorizontal: 10, paddingHorizontal: 10, paddingTop: 14 }}>
-            <View
-              style={{
-                paddingVertical: 10,
-                // paddingLeft: 20,
-                justifyContent: 'flex-start',
-                flexDirection: 'row',
-              }}>
-              <Text style={{ fontSize: 14, paddingRight: 10, color: 'black' }}>
-                {t('upi_id')}
-              </Text>
-              {verificationDB.upiVerified === true ? (
+          <UpiKycCard
+            verified={verificationDB.upiVerified === true}
+            upiId={verifiedFormik.values.upiNumber ?? upiIdNumber}
+            // Show the error once the user leaves the field.
+            upiIdError={verifiedFormik.touched.upiNumber ? verifiedFormik.errors.upiNumber : null}
+            onChangeUpiId={(upi: string) => {
+              setUpiIdNumber(upi);
+              verifiedFormik.setFieldValue('upiNumber', upi);
+            }}
+            onBlurUpiId={() => verifiedFormik.setFieldTouched('upiNumber', true)}
+            screenshotUri={
+              verifiedFormik.values['upiImage']
+                ? conditonalAPI.upiImage
+                  ? `${imagePath.IMAGE_URL}${verifiedFormik.values['upiImage']}`
+                  : `${verifiedFormik.values['upiImage']}`
+                : null
+            }
+            screenshotError={
+              upiIdNumber && !verifiedFormik.values['upiImage'] ? 'UPI screenshot is required' : null
+            }
+            onPickScreenshot={toggleDialogUPIID}
+            onRemoveScreenshot={() => {
+              verifiedFormik.setFieldValue('upiImage', '');
+              // Clear the pending upload too, or the removed screenshot is still sent.
+              setUpiObject(null);
+              setUpiIdFile(null);
+              setUpiIdFileURI(null);
+            }}
+            onPreviewScreenshot={() => setShowUPIID(true)}
+          />
+          {showUPIID ? (
+            <Modal animationType="slide" transparent={true}>
+              <Dialog
+                overlayStyle={{ borderRadius: 20 }}
+                isVisible={showUPIID}
+                onBackdropPress={toggleUPIID}>
                 <View
-                  style={styles.verifiedView}>
-                  <Ionicons
-                    name="checkmark-circle"
-                    color={'green'}
-                    size={15}
-                    style={{ paddingLeft: 10 }}
-                  />
-                  <Text
-                    style={styles.verifiedText}>
-                    {t('verified')}
-                  </Text>
-                </View>
-              ) : (
-                <View
-                  style={styles.notVerifiedView}>
-                  <Ionicons
-                    name="close-circle"
-                    color={'red'}
-                    size={15}
-                    style={{ paddingLeft: 10 }}
-                  />
-                  <Text
-                    style={styles.notVerifiedText}>
-                    {t('notverified')}
-                  </Text>
-                </View>
-              )}
-            </View>
-            <View
-              style={[
-                styles.inputBox,
-                { borderColor: 'rgba(0,0,0,0.08)', marginVertical: 10, marginTop: 4 },
-              ]}>
-              {/* <TextInput
-              style={styles.innerBox}
-              autoCapitalize="none"
-              editable={verificationDB.upiVerified != true ? true : false}
-              placeholderTextColor={'grey'}
-              value={upiIdNumber}
-              onChangeText={text => {
-                setUpiIdNumber(text)
-              }}
-              placeholder={`UPI ID`}
-            /> */}
-              <TextInput
-                style={styles.innerBox}
-                autoCapitalize="none"
-                editable={!verificationDB.upiVerified}
-                placeholderTextColor={'grey'}
-                value={verifiedFormik.values.upiNumber || upiIdNumber}
-                onChangeText={text => {
-                  setUpiIdNumber(text);
-                  verifiedFormik.setFieldValue('upiNumber', text);
-                  setTimeout(() => verifiedFormik.validateForm(), 100);
-                }}
-                placeholder="UPI ID"
-              />
-
-            </View>
-
-            <View
-              style={{
-                paddingVertical: 10,
-                justifyContent: 'flex-start',
-                flexDirection: 'row',
-              }}>
-              <Text style={{ fontSize: 14, paddingRight: 10, color: 'black' }}>
-                {t('upi_id_image')}
-              </Text>
-              {verificationDB.upiVerified === true ? (
-                <View
-                  style={styles.verifiedView}>
-                  <Ionicons
-                    name="checkmark-circle"
-                    color={'green'}
-                    size={15}
-                    style={{ paddingLeft: 10 }}
-                  />
-                  <Text
-                    style={styles.verifiedText}>
-                    {t('verified')}
-                  </Text>
-                </View>
-              ) : (
-                <View
-                  style={styles.notVerifiedView}>
-                  <Ionicons
-                    name="close-circle"
-                    color={'red'}
-                    size={15}
-                    style={{ paddingLeft: 10 }}
-                  />
-                  <Text
-                    style={styles.notVerifiedText}>
-                    {t('notverified')}
-                  </Text>
-                </View>
-              )}
-            </View>
-            <View
-              style={[styles.boxWrapper, { width: '100%', }]}>
-              {verificationDB.upiVerified != true ?
-                <View
-                  style={styles.boxCrossIcon}>
-                  <Ionicons
-                    name="close-circle-outline"
-                    size={25}
-                    color={'red'}
-                    onPress={() => {
-                      verifiedFormik.setFieldValue('upiImage', '');
-                      setUpiIdFile(null);
-                      setUpiIdFileURI(null);
-                    }}
-                  />
-                </View>
-                : null}
-              {
-                verifiedFormik.values['upiImage'] ? (
-                  <ImageRNE
-                    style={styles.boxImage}
-                    onPress={() => setShowUPIID(true)}
+                  style={styles.modalView}>
+                  <Image
+                    style={styles.modalImage}
                     source={{
                       uri: conditonalAPI.upiImage
                         ? `${imagePath.IMAGE_URL}${verifiedFormik.values['upiImage']}`
                         : `${verifiedFormik.values['upiImage']}`,
                       cache: 'reload',
-                    }}
-                  />
-                ) : null
-              }
-
-              {!conditonalAPI?.upiImage || !verifiedFormik?.values?.upiImage ?
-                <View
-                  style={styles.boxImageUploadButton}>
-                  <View style={{ flexDirection: 'row' }}>
-                    <Button
-                      title={'Upload'}
-                      titleStyle={{ color: 'black' }}
-                      onPress={toggleDialogUPIID}
-                      // disabled={verificationDB.upiVerified}
-                      color={'#FFE7C7'}
-                      containerStyle={{
-                        borderRadius: 18,
-                        padding: 3,
-                      }}
-                      iconPosition="right"
-                      icon={
-                        <Ionicons
-                          name="cloud-upload-sharp"
-                          size={20}
-                          color={'black'}
-                          style={{
-                            paddingHorizontal: 5,
-                            alignSelf: 'flex-end',
-                          }}
-                        />
-                      }
-                    />
-                  </View>
-                </View> : null}
-
-              <View style={{ padding: 1 }}></View>
-            </View>
-            {(upiIdNumber && (!conditonalAPI.upiImage && !verifiedFormik.values['upiImage'])) && (
-              <Text style={{ fontSize: 11, color: 'red' }}>
-                {'UPI screenshot is required'}
-              </Text>
-            )}
-            {showUPIID ? (
-              <Modal animationType="slide" transparent={true}>
-                <Dialog
-                  overlayStyle={{ borderRadius: 20 }}
-                  isVisible={showUPIID}
-                  onBackdropPress={toggleUPIID}>
-                  <View
-                    style={styles.modalView}>
-                    <Image
-                      style={styles.modalImage}
-                      source={{
-                        uri: conditonalAPI.upiImage
-                          ? `${imagePath.IMAGE_URL}${verifiedFormik.values['upiImage']}`
-                          : `${verifiedFormik.values['upiImage']}`,
-                        cache: 'reload',
-                      }}></Image>
-                  </View>
-                </Dialog>
-              </Modal>
-            ) : null}
-            {/* {verifiedFormik.errors.upiImage && (
-            <Text style={{ fontSize: 11, color: 'red', paddingLeft: 20 }}>
-              {verifiedFormik.errors.upiImage}
-            </Text>
-          )} */}
-          </View>
+                    }}></Image>
+                </View>
+              </Dialog>
+            </Modal>
+          ) : null}
+          </>)}
           {console.log('Formik Values:', verifiedFormik.values)}
           {console.log('Formik Errors:', verifiedFormik.errors)}
           {console.log('Formik isValid:', verifiedFormik.isValid)}
@@ -2426,15 +1880,15 @@ const Profile = (props: any) => {
                 <Dialog.Button
                   title="Camera"
                   onPress={() => {
-                    avatarCamera();
-                    toggleDialogAvatar();
+                    setvisibleAvatar(false);
+                    afterDialogClosed(avatarCamera);
                   }}
                 />
                 <Dialog.Button
                   title="Gallery"
                   onPress={() => {
-                    avatarGallery();
-                    toggleDialogAvatar();
+                    setvisibleAvatar(false);
+                    afterDialogClosed(avatarGallery);
                   }}
                 />
               </View>
@@ -2447,15 +1901,15 @@ const Profile = (props: any) => {
                 <Dialog.Button
                   title="Camera"
                   onPress={() => {
-                    shopCamera();
-                    toggleDialogShop();
+                    setvisibleShop(false);
+                    afterDialogClosed(shopCamera);
                   }}
                 />
                 <Dialog.Button
                   title="Gallery"
                   onPress={() => {
-                    shopGallery();
-                    toggleDialogShop();
+                    setvisibleShop(false);
+                    afterDialogClosed(shopGallery);
                   }}
                 />
               </View>
@@ -2576,10 +2030,301 @@ const Profile = (props: any) => {
             </Dialog.Actions>
           </Dialog>
         </KeyboardAwareScrollView>
-      </SafeAreaView>
+      </View>
     </View>
   );
 };
+
+const pStyles = StyleSheet.create({
+  kycIntro: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: '5%',
+    marginTop: 16,
+    backgroundColor: '#FFFBE0',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#F2EC7A',
+    padding: 14,
+  },
+  kycIntroIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 13,
+    backgroundColor: appTheme.NEW_PALLET,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  kycIntroTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1C1C1C',
+  },
+  kycIntroText: {
+    fontSize: 12,
+    color: '#6B6B6B',
+    marginTop: 2,
+  },
+  kycCard: {
+    marginHorizontal: '5%',
+    marginTop: 14,
+    backgroundColor: 'white',
+    borderRadius: 18,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#F2E3B8',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  kycCardTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  kycCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF1D2',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  kycCtaText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: appTheme.DARK_BOTTOMTAB,
+    marginRight: 2,
+  },
+  kycProgressTrack: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#EFEFEF',
+    marginTop: 14,
+    overflow: 'hidden',
+  },
+  kycProgressFill: {
+    height: '100%',
+    borderRadius: 3,
+    backgroundColor: '#1E9E5A',
+  },
+  kycChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 12,
+    gap: 8,
+  },
+  kycChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  kycChipText: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    marginLeft: 4,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'white',
+    paddingHorizontal: 16,
+    paddingTop: 6,
+    paddingBottom: 12,
+    borderBottomLeftRadius: 22,
+    borderBottomRightRadius: 22,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 4,
+    zIndex: 2,
+  },
+  headerButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#F4F4F4',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1C1C1C',
+  },
+  summaryCard: {
+    marginHorizontal: '5%',
+    marginTop: 16,
+    borderRadius: 20,
+    padding: 16,
+    overflow: 'hidden',
+  },
+  summaryDecor: {
+    position: 'absolute',
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    right: -50,
+    top: -70,
+    backgroundColor: 'rgba(247,209,133,0.12)',
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  avatarWrap: {
+    width: 72,
+    height: 72,
+  },
+  avatar: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    borderWidth: 2.5,
+    borderColor: appTheme.NEW_PALLET,
+  },
+  avatarPlaceholder: {
+    backgroundColor: appTheme.NEW_PALLET,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarBadge: {
+    position: 'absolute',
+    right: -2,
+    bottom: -2,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: 'white',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: appTheme.NEW_PALLET,
+  },
+  summaryName: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: 'white',
+  },
+  summaryMobile: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.7)',
+    marginTop: 3,
+  },
+  typeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: appTheme.NEW_PALLET,
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginTop: 8,
+  },
+  typeChipText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: appTheme.DARK_BOTTOMTAB,
+    marginLeft: 4,
+  },
+  summaryActions: {
+    flexDirection: 'row',
+    marginTop: 16,
+    gap: 10,
+  },
+  actionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    paddingVertical: 10,
+  },
+  actionPrimary: {
+    backgroundColor: appTheme.NEW_PALLET,
+  },
+  actionPrimaryText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: appTheme.DARK_BOTTOMTAB,
+    marginLeft: 6,
+  },
+  actionSecondary: {
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.35)',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  actionSecondaryText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: 'white',
+    marginLeft: 6,
+    flexShrink: 1,
+  },
+  editBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: '5%',
+    marginTop: 12,
+    backgroundColor: '#FFF4DB',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  editBannerText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#8A6100',
+    marginLeft: 8,
+  },
+  fieldLabel: {
+    fontSize: 13,
+    color: 'black',
+    marginTop: 10,
+    marginBottom: 6,
+  },
+  dropdown: {
+    height: 48,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.15)',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    backgroundColor: 'white',
+  },
+  dropdownLocked: {
+    backgroundColor: '#F5F5F5',
+  },
+  dropdownText: {
+    fontSize: 15,
+    color: 'black',
+  },
+  dropdownPlaceholder: {
+    fontSize: 15,
+    color: '#A0A0A0',
+  },
+  errorText: {
+    fontSize: 11,
+    color: 'red',
+    marginTop: 4,
+  },
+  sectionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: '5%',
+    marginTop: 24,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1C1C1C',
+    marginLeft: 8,
+  },
+});
 
 const styles = StyleSheet.create({
 

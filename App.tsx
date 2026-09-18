@@ -28,7 +28,10 @@ import { NavigationContainer } from '@react-navigation/native';
 import { PushNotification } from 'react-native-push-notification';
 import { Router } from './src/navigation/Router';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS);
+// Android-only API; on iOS it just logs a warning.
+if (Platform.OS === 'android') {
+  PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS);
+}
 const App = () => {
   const navigationRef = React.useRef(null)
   // const isDarkMode = useColorScheme() === 'dark';

@@ -6,6 +6,7 @@ import {StyleSheet, Text, View} from 'react-native';
 import {TouchableOpacity} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import '../../../../i18n/i18n';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 
 const LanguageDropdown = (props: any) => {
   const {t, i18n} = useTranslation();
@@ -20,21 +21,41 @@ const LanguageDropdown = (props: any) => {
     {label: 'বাংলা', value: 'bn'},
     {label: 'தமிழ்', value: 'ta'},
   ];
+  // variant="pill": compact rounded look used in the dashboard header.
+  const pill = props.variant === 'pill';
   return (
     // <View style={styles.container}>
     <Dropdown
       data={langs}
-      style={{
-        height: 40,
-        width: 100,
-        padding: 5,
-        // maxHeight: 40,
-        backgroundColor: 'white',
-        borderColor: '#ccc',
-        borderWidth: 1,
-        borderRadius: 8,
-      }}
-      selectedTextStyle={{fontWeight: '500'}}
+      style={
+        pill
+          ? {
+              height: 36,
+              width: 108,
+              paddingHorizontal: 10,
+              backgroundColor: '#F4F4F4',
+              borderRadius: 18,
+            }
+          : {
+              height: 40,
+              width: 100,
+              padding: 5,
+              // maxHeight: 40,
+              backgroundColor: 'white',
+              borderColor: '#ccc',
+              borderWidth: 1,
+              borderRadius: 8,
+            }
+      }
+      renderLeftIcon={
+        pill
+          ? () => (
+              <Ionicons name="language-outline" size={16} color="#373435" style={{marginRight: 4}} />
+            )
+          : undefined
+      }
+      iconStyle={pill ? {width: 16, height: 16} : undefined}
+      selectedTextStyle={pill ? {fontWeight: '600', fontSize: 13, color: '#373435'} : {fontWeight: '500'}}
       // itemTextStyle={{margin: 0, padding: 0, fontSize: 10}}
       selectedTextProps={{selectionColor: 'black'}}
       labelField="label"

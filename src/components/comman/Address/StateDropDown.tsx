@@ -1,6 +1,7 @@
 import React, {useState, useEffect} from 'react';
 import {requestGetStateList} from '../../../services/backend_helper';
 import {Dropdown} from 'react-native-element-dropdown';
+import {pickerListProps} from './dropdownTheme';
 import {Dimensions} from 'react-native';
 import {useTranslation} from 'react-i18next';
 
@@ -37,20 +38,15 @@ const StateDropDown = (props: any) => {
 
         // borderBottomColor:
 
+        // Optional override, e.g. to fit inside a card.
+        ...(props.dropdownStyle || {}),
       }}
       //
 
-      containerStyle={{borderRadius: 8}}
-      dropdownPosition={'top'}
       //
-      selectedTextStyle={{color: 'black'}}
       selectedTextProps={{selectionColor: 'black'}}
-      itemTextStyle={{paddingLeft: 10}}
-      inputSearchStyle={{
-        height: 40,
-        // fontSize: 16,
-      }}
-      maxHeight={300}
+      search
+      {...pickerListProps({selectedValue: statename, searchPlaceholder: 'Search state', icon: 'map-outline'})}
       labelField="label"
       valueField="value"
       placeholder={`${t('select')} ${t('state')}`}

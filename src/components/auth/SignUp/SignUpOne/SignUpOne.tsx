@@ -12,6 +12,9 @@ import {
   Platform,
   PermissionsAndroid,
   Modal,
+  Alert,
+  StyleSheet,
+  ActivityIndicator,
 } from 'react-native';
 import axios from 'axios';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
@@ -70,6 +73,8 @@ import {
   alertLocationUnavailable,
 } from '../../../../utils/locationHelper';
 import type {UserCoordinates} from '../../../../utils/locationHelper';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { KycCardHeader, KycField, kycStyles } from '../../../bottomtabs/profile/KycCardParts';
 
 export interface CreateUserInterface {
   readonly firmName?: string;
@@ -85,6 +90,7 @@ export interface CreateUserInterface {
 }
 const SignUpOne = (props: any) => {
   const { t } = useTranslation();
+  const safeInsets = useSafeAreaInsets();
 
   const [tempDisable, setTempDisable] = useState(false);
   const navigation = useNavigation();
@@ -149,6 +155,7 @@ const SignUpOne = (props: any) => {
   const initialValues = {
     firmName: '',
     contactPerson: '',
+    buyerName: '',
     mobile: route.params.mobileno,
     customerType: '',
     email: null,
@@ -209,6 +216,7 @@ const SignUpOne = (props: any) => {
     address: Yup.object({
       postalCode: Yup.string()
         .required(`${t('requirederror', { fieldname: `${t('postalcode')}` })}`)
+        .matches(/^[0-9]+$/, 'Postal code must contain only digits')
         .min(
           6,
           ({ min }) =>
@@ -245,11 +253,13 @@ const SignUpOne = (props: any) => {
     var data = {
       firmName: formik.values.firmName,
       contactPerson: formik.values.contactPerson,
+      // Optional; only sent when filled so older backends don't reject the field.
+      ...(formik.values.buyerName?.trim() ? { buyerName: formik.values.buyerName.trim() } : {}),
       phoneCode: '+91',
       mobile: formik.values.mobile,
 
       deviceToken: `${fcmToken}`,
-      deviceType: 'android',
+      deviceType: Platform.OS,
 
       // email: null,
       // password: formik.values.password,
@@ -265,28 +275,31 @@ const SignUpOne = (props: any) => {
       },
     };
     console.log('Button Pressed++++++',data);
-    if(fcmToken){
-      console.log('Sign Up Data', data);
-      requestSignup(data)
-        .then(res => {
-          console.log('response', res);
-          // formik.setFieldValue('isClicked', false);
-          if (res.isError == false && res.message == 'SUCCESS') {
-            // formik.setValues({ ...initialValues, isClicked: false });
-            console.log(res.data);
-            var resData = JSON.stringify(res.data);
-            setTokenAsyncStorage(res?.data?.token);
-            dispatch(login(resData));
-            dispatch(stackUpdate('dashboard'));
-          } else {
-            () => console.log('Ask me later pressed');
-          }
-        })
-        .catch(error => {
-          // formik.setFieldValue("isClicked", false);
-          console.log('Sign Up Error Response >>>>  ', error);
-        });
-    }
+    // Don't block sign up when the FCM token is missing (e.g. iOS simulator or
+    // notifications denied) - the OTP login flow already allows this.
+    console.log('Sign Up Data', data);
+    setBtnClicked(true);
+    requestSignup(data)
+      .then(res => {
+        console.log('response', res);
+        if (res.isError == false && res.message == 'SUCCESS') {
+          console.log(res.data);
+          var resData = JSON.stringify(res.data);
+          setTokenAsyncStorage(res?.data?.token);
+          dispatch(login(resData));
+          dispatch(stackUpdate('dashboard'));
+        } else {
+          Alert.alert('Sign Up Failed', res?.message || 'Something went wrong. Please try again.');
+        }
+      })
+      .catch(error => {
+        console.log('Sign Up Error Response >>>>  ', error);
+        Alert.alert(
+          'Sign Up Failed',
+          error?.response?.data?.message || error?.message || 'Something went wrong. Please try again.',
+        );
+      })
+      .finally(() => setBtnClicked(false));
     
   };
   const mobileCall = async (values: any) => {
@@ -344,313 +357,319 @@ const SignUpOne = (props: any) => {
   // }, [visibleLocation]);
 
   const [isBtnClicked, setBtnClicked] = useState(false);
+
+  // Loosely typed views of formik errors / route params for the JSX below.
+  const errs: any = formik.errors;
+  const routeParams: any = route.params ?? {};
+
+  const dropdownStyle: any = {
+    width: '100%',
+    height: 48,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.15)',
+  };
+
   return (
-    <View style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
-      {/* {!visibleLocation ? ( */}
-      {/* <SafeAreaView> */}
-        <HeaderRNE
-          backgroundColor="white"
-          backgroundImageStyle={{}}
-          barStyle="default"
-          centerComponent={{
-            text: `${t('signup')}`,
-            style: { color: 'black', fontSize: 19, fontWeight: 'bold' },
-          }}
-          centerContainerStyle={{ height: 28, justifyContent: 'flex-start' }}
-          leftComponent={
-            // <View>
-            <TouchableOpacity onPress={() => navigation.goBack()}>
-              <View
-                style={{
-                  backgroundColor: '#F5F5F5',
-                  height: 30,
-                  width: 30,
-                  borderRadius: 30 / 2,
-                  alignContent: 'center',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                }}>
-                <Icon name="chevron-back" size={24} />
-              </View>
-            </TouchableOpacity>
-          }
-          placement="left"
-        />
-        <KeyboardAwareScrollView keyboardDismissMode='on-drag'>
-          <View style={styles.viewContainer}>
-            {/* <View> */}
-            <View style={{ marginBottom: 40 }}>
-              <Input
-                containerStyle={{
-                  justifyContent: 'center',
-                  paddingTop: 20,
-                  paddingBottom: 0,
-                  borderColor: 'rgba(0,0,0,0.08)',
-                }}
-                inputContainerStyle={{
-                  borderColor: 'rgba(0,0,0,0.08)',
-                  borderWidth: 1,
-                  borderRadius: 10,
-                  paddingHorizontal: 12
-                }}
-                renderErrorMessage={false}
-                value={formik.values.contactPerson}
-                onChangeText={(text: string) => {
-                  formik.setFieldValue('contactPerson', text);
-                }}
-                textContentType="name"
-                label={`${t('name')}`}
-                labelStyle={{
-                  fontWeight: '100',
-                  fontSize: 15,
-                  color: 'black',
-                  paddingBottom: 10,
-                }}
-              />
-              {formik.errors.contactPerson && (
-                <Text style={{ paddingLeft: 10, fontSize: 11, color: 'red' }}>
-                  {formik.errors.contactPerson}
-                </Text>
-              )}
-              <View style={{  }}>
-                <Text
-                  style={{
-                    paddingTop: 20,
-                    paddingLeft: 10,
-                    paddingBottom: 10,
-                    color: 'black',
-                    fontWeight:'bold',
-                    fontSize: 15,
-                  }}>
-                  {`${t('select')} ${t('customertype')}`}
-                </Text>
-                <View
-                  style={{
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                  }}>
-                  <CustomerTypeDropDowm
-                    handleInputChange={handleInputChange}
-                    statename={formik?.values?.customerType}
-                  />
-                </View>
-                {formik.errors.customerType && (
-                  <Text style={{ paddingLeft: 10, fontSize: 11, color: 'red' }}>
-                    {formik.errors.customerType}
-                  </Text>
-                )}
-              </View>
-              <Input
-                containerStyle={{
-                  justifyContent: 'center',
-                  paddingTop: 20,
-                  paddingBottom: 0,
-                  borderColor: 'rgba(0,0,0,0.08)',
-                }}
-                inputContainerStyle={{
-                  borderColor: 'rgba(0,0,0,0.08)',
-                  borderWidth: 1,
-                  borderRadius: 10,
-                  paddingHorizontal: 12
-                }}
-                renderErrorMessage={false}
-                value={route.params.mobileno}
-                disabled={true}
-                label={`${t('phoneno')}`}
-                labelStyle={{
-                  fontWeight: '100',
-                  fontSize: 15,
-                  color: 'black',
-                  paddingBottom: 10,
-                }}
-              />
-              <Input
-                containerStyle={{
-                  justifyContent: 'center',
-                  paddingTop: 20,
-                  paddingBottom: 0,
-                  borderColor: 'rgba(0,0,0,0.08)',
-                }}
-                inputContainerStyle={{
-                  borderColor: 'rgba(0,0,0,0.08)',
-                  borderWidth: 1,
-                  borderRadius: 10,
-                  paddingHorizontal: 12
-                }}
-                renderErrorMessage={false}
-                value={formik.values.firmName}
-                onChangeText={(text: string) => {
-                  formik.setFieldValue('firmName', text);
-                }}
-                label={`${t('shopname')}`}
-                labelStyle={{
-                  fontWeight: '100',
-                  fontSize: 15,
-                  color: 'black',
-                  paddingBottom: 10,
-                }}
-              />
-              {formik.errors.firmName && (
-                <Text style={{ paddingLeft: 10, fontSize: 11, color: 'red' }}>
-                  {formik.errors.firmName}
-                </Text>
-              )}
-              <Input
-                containerStyle={{
-                  justifyContent: 'center',
-                  paddingTop: 20,
-                  paddingBottom: 0,
-                  borderColor: 'rgba(0,0,0,0.08)',
-                }}
-                inputContainerStyle={{
-                  borderColor: 'rgba(0,0,0,0.08)',
-                  borderWidth: 1,
-                  borderRadius: 10,
-                  paddingHorizontal: 12
-                }}
-                renderErrorMessage={false}
-                value={formik.values.address.address}
-                onChangeText={(text: string) => {
-                  formik.setFieldValue('address.address', text);
-                  // formik.setFieldValue()
-                }}
-                label={`${t('address')}`}
-                labelStyle={{
-                  fontWeight: '100',
-                  fontSize: 15,
-                  color: 'black',
-                  paddingBottom: 10,
-                }}
-              />
-              {formik.errors.address?.address && (
-                <Text style={{ paddingLeft: 10, fontSize: 11, color: 'red' }}>
-                  {formik.errors.address.address}
-                </Text>
-              )}
-              <Input
-                containerStyle={{
-                  justifyContent: 'center',
-                  paddingTop: 20,
-                  paddingBottom: 0,
-                  borderColor: 'rgba(0,0,0,0.08)',
-                }}
-                inputContainerStyle={{
-                  borderColor: 'rgba(0,0,0,0.08)',
-                  borderWidth: 1,
-                  borderRadius: 10,
-                  paddingHorizontal: 12
-                }}
-                maxLength={6}
-                renderErrorMessage={false}
-                value={formik?.values?.address?.postalCode}
-                onChangeText={(text: string) => {
-                  formik.setFieldValue('address.postalCode', text);
-                  // formik.setFieldValue()
-                }}
-                keyboardType="numeric"
-                label={`${t('postalcode')}`}
-                labelStyle={{
-                  fontWeight: '100',
-                  fontSize: 15,
-                  color: 'black',
-                  paddingBottom: 10,
-                }}
-              />
-              {formik.errors.address?.postalCode && (
-                <Text style={{ paddingLeft: 10, fontSize: 11, color: 'red' }}>
-                  {formik.errors.address.postalCode}
-                </Text>
-              )}
-              
-              <View style={{ marginBottom: 20 }}>
-                <Text
-                  style={{
-                    paddingTop: 20,
-                    paddingLeft: 10,
-                    paddingBottom: 10,
-                    color: 'black',
-                    fontSize: 15,
-                  }}>
-                  {`${t('select')} ${t('state')}`}
-                </Text>
-                <View
-                  style={{
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                  }}>
-                  <StateDropDown
-                    handleInputChange={handleInputChange}
-                    statename={formik?.values?.address?.state}
-                  />
-                </View>
-                {formik.errors.address?.state && (
-                  <Text style={{ paddingLeft: 10, fontSize: 11, color: 'red' }}>
-                    {formik.errors.address?.state}
-                  </Text>
-                )}
-              </View>
-              <View style={{ marginBottom: 20 }}>
-                <Text
-                  style={{
-                    paddingTop: 20,
-                    paddingLeft: 10,
-                    paddingBottom: 10,
-                    color: 'black',
-                    fontSize: 15,
-                  }}>
-                  {`${t('select')} ${t('city')}`}
-                </Text>
-                <View
-                  style={{
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                  }}>
-                  <CityDropDown
-                    handleInputChange={handleInputChange}
-                    statename={formik?.values?.address?.state}
-                    city={formik?.values?.address?.city}
-                  />
-                </View>
-                {formik.errors.address?.city && (
-                  <Text style={{ paddingLeft: 10, fontSize: 11, color: 'red' }}>
-                    {formik.errors.address?.city}
-                  </Text>
-                )}
-              </View>
-              <Button
-                title={`${t('submit')}`}
-                onPress={() => {
-                  console.log('Values ', formik.values);
-                  formik.handleSubmit();
-                }}
-                style={{ paddingTop: 20 }}
-                buttonStyle={{
-                  backgroundColor: appTheme.NEW_PALLET,
-                  borderRadius: 8,
-                }}
-                titleStyle={{ color: 'black' }}
-                containerStyle={{ paddingTop: 10, marginBottom: 10 }}
-                disabled={tempDisable}
-              />
-              {tempDisable ? (
-                <Text
-                  style={{
-                    color: 'red',
-                    // justifyContent: 'center',
-                    // alignContent: 'center',
-                    // alignItems: 'center',
-                  }}>
-                  {`${t('account_already')}`}
-                </Text>
-              ) : null}
-            </View>
+    // White behind the status bar so it blends with the header; the page itself is grey.
+    <View style={{ flex: 1, backgroundColor: 'white' }}>
+      <View style={suStyles.header}>
+        <Pressable
+          onPress={() => navigation.goBack()}
+          hitSlop={6}
+          style={({ pressed }) => [suStyles.headerButton, pressed && { opacity: 0.6 }]}>
+          <Icon name="chevron-back" size={22} color={appTheme.DARK_BOTTOMTAB} />
+        </Pressable>
+        <Text style={suStyles.headerTitle}>{`${t('signup')}`}</Text>
+        <View style={{ width: 40 }} />
+      </View>
+
+      <KeyboardAwareScrollView
+        style={{ backgroundColor: '#F7F7F7' }}
+        contentContainerStyle={{ paddingBottom: 40 + safeInsets.bottom }}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        showsVerticalScrollIndicator={false}>
+        {/* Intro */}
+        <View style={suStyles.intro}>
+          <View style={suStyles.introIcon}>
+            <Icon name="person-add" size={22} color={appTheme.DARK_BOTTOMTAB} />
           </View>
-          {/* </View> */}
-        </KeyboardAwareScrollView>
-        <SafeAreaView />
-      {/* </SafeAreaView> */}
+          <View style={{ flex: 1, marginLeft: 12 }}>
+            <Text style={suStyles.introTitle}>Create your account</Text>
+            <Text style={suStyles.introText}>
+              Tell us about you and your shop to start earning points.
+            </Text>
+          </View>
+        </View>
+
+        {/* Personal details */}
+        <View style={kycStyles.card}>
+          <KycCardHeader icon="person-outline" title="Your Details" />
+          <KycField
+            label={`${t('name')} *`}
+            icon="person-outline"
+            locked={false}
+            value={formik.values.contactPerson}
+            onChangeText={(text: string) => formik.setFieldValue('contactPerson', text)}
+            textContentType="name"
+            autoCapitalize="words"
+            placeholder="Enter your full name"
+            error={errs.contactPerson}
+          />
+          <KycField
+            label={`${t('phoneno')}`}
+            icon="call-outline"
+            locked
+            value={`${routeParams.mobileno ?? ''}`}
+            helper="Verified with OTP"
+          />
+          <Text style={suStyles.fieldLabel}>{`${t('customertype')} *`}</Text>
+          <CustomerTypeDropDowm
+            handleInputChange={handleInputChange}
+            statename={formik?.values?.customerType}
+            dropdownStyle={dropdownStyle}
+          />
+          {errs.customerType ? (
+            <Text style={suStyles.errorText}>{errs.customerType}</Text>
+          ) : null}
+        </View>
+
+        {/* Shop details */}
+        <View style={kycStyles.card}>
+          <KycCardHeader icon="storefront-outline" title="Shop Details" />
+          <KycField
+            label={`${t('shopname')} *`}
+            icon="storefront-outline"
+            locked={false}
+            value={formik.values.firmName}
+            onChangeText={(text: string) => formik.setFieldValue('firmName', text)}
+            autoCapitalize="words"
+            placeholder="Enter shop name"
+            error={errs.firmName}
+          />
+          <KycField
+            label="Buyer Name (Optional)"
+            icon="cart-outline"
+            locked={false}
+            value={formik.values.buyerName}
+            onChangeText={(text: string) => formik.setFieldValue('buyerName', text)}
+            autoCapitalize="words"
+            maxLength={60}
+            placeholder="Person who buys stock for the shop"
+          />
+        </View>
+
+        {/* Address */}
+        <View style={kycStyles.card}>
+          <KycCardHeader icon="location-outline" title="Shop Address" />
+          <KycField
+            label={`${t('address')}`}
+            icon="home-outline"
+            locked={false}
+            value={formik.values.address.address}
+            onChangeText={(text: string) => formik.setFieldValue('address.address', text)}
+            placeholder="House / shop no., street, area"
+            error={errs.address?.address}
+          />
+          <KycField
+            label={`${t('postalcode')} *`}
+            icon="mail-outline"
+            locked={false}
+            value={formik?.values?.address?.postalCode}
+            onChangeText={(text: string) =>
+              formik.setFieldValue('address.postalCode', text.replace(/[^0-9]/g, ''))
+            }
+            keyboardType="number-pad"
+            maxLength={6}
+            placeholder="6-digit PIN code"
+            error={errs.address?.postalCode}
+          />
+          <Text style={suStyles.fieldLabel}>{`${t('state')} *`}</Text>
+          <StateDropDown
+            handleInputChange={handleInputChange}
+            statename={formik?.values?.address?.state}
+            dropdownStyle={dropdownStyle}
+          />
+          {errs.address?.state ? (
+            <Text style={suStyles.errorText}>{errs.address?.state}</Text>
+          ) : null}
+          <Text style={suStyles.fieldLabel}>{`${t('city')}`}</Text>
+          <CityDropDown
+            handleInputChange={handleInputChange}
+            statename={formik?.values?.address?.state}
+            city={formik?.values?.address?.city}
+            dropdownStyle={dropdownStyle}
+          />
+          {errs.address?.city ? (
+            <Text style={suStyles.errorText}>{errs.address?.city}</Text>
+          ) : null}
+          <View style={suStyles.locationNote}>
+            <Icon name="location" size={14} color="#2F6FED" />
+            <Text style={suStyles.locationNoteText}>
+              Your current location is saved with your shop, so please sign up from your shop.
+            </Text>
+          </View>
+        </View>
+
+        {tempDisable ? (
+          <View style={suStyles.existsBox}>
+            <Icon name="alert-circle" size={18} color="#D93025" />
+            <Text style={suStyles.existsText}>{`${t('account_already')}`}</Text>
+          </View>
+        ) : null}
+
+        <Pressable
+          disabled={tempDisable || isBtnClicked}
+          onPress={() => formik.handleSubmit()}
+          style={({ pressed }) => [
+            suStyles.submitButton,
+            (tempDisable || isBtnClicked) && suStyles.submitDisabled,
+            pressed && { transform: [{ scale: 0.98 }] },
+          ]}>
+          {isBtnClicked ? (
+            <ActivityIndicator color={appTheme.DARK_BOTTOMTAB} />
+          ) : (
+            <>
+              <Text style={suStyles.submitText}>{`${t('submit')}`}</Text>
+              <Icon name="arrow-forward" size={18} color={appTheme.DARK_BOTTOMTAB} style={{ marginLeft: 6 }} />
+            </>
+          )}
+        </Pressable>
+      </KeyboardAwareScrollView>
     </View>
   );
 };
+
+const suStyles = StyleSheet.create({
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'white',
+    paddingHorizontal: 16,
+    paddingTop: 6,
+    paddingBottom: 12,
+    borderBottomLeftRadius: 22,
+    borderBottomRightRadius: 22,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 4,
+    zIndex: 2,
+  },
+  headerButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#F4F4F4',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1C1C1C',
+  },
+  intro: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '90%',
+    alignSelf: 'center',
+    marginTop: 16,
+    backgroundColor: '#FFFBE0',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#F2EC7A',
+    padding: 14,
+  },
+  introIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: '#FBF201',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  introTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1C1C1C',
+  },
+  introText: {
+    fontSize: 12.5,
+    color: '#6B6B6B',
+    marginTop: 3,
+  },
+  fieldLabel: {
+    fontSize: 13,
+    color: 'black',
+    marginTop: 12,
+    marginBottom: 6,
+  },
+  errorText: {
+    fontSize: 11,
+    color: 'red',
+    marginTop: 4,
+  },
+  locationNote: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginTop: 14,
+    backgroundColor: '#E8F0FF',
+    borderRadius: 10,
+    padding: 10,
+  },
+  locationNoteText: {
+    flex: 1,
+    fontSize: 11.5,
+    color: '#3A4A6B',
+    marginLeft: 6,
+    lineHeight: 16,
+  },
+  existsBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '90%',
+    alignSelf: 'center',
+    marginTop: 14,
+    backgroundColor: '#FDECEA',
+    borderRadius: 12,
+    padding: 12,
+  },
+  existsText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#D93025',
+    marginLeft: 8,
+  },
+  submitButton: {
+    flexDirection: 'row',
+    width: '90%',
+    alignSelf: 'center',
+    marginTop: 20,
+    height: 52,
+    borderRadius: 14,
+    backgroundColor: appTheme.NEW_PALLET,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#C9962F',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  submitDisabled: {
+    backgroundColor: '#ECECEC',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  submitText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: appTheme.DARK_BOTTOMTAB,
+  },
+});
 
 export default SignUpOne;

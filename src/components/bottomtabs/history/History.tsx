@@ -8,6 +8,8 @@ import {
   Dimensions,
   BackHandler,
   Platform,
+  Pressable,
+  StyleSheet,
 } from 'react-native';
 import React, { useEffect, useRef, useState } from 'react';
 import styles from './styles';
@@ -50,6 +52,8 @@ import { BlackCalendarIcon, CloseIcon, FilterIcon } from '../../Svg/Svg';
 import DateTimePicker from '@react-native-community/datetimepicker'
 import LinearGradient from 'react-native-linear-gradient';
 import { getTokenAsyncStorage } from '../../../services/auth_helper';
+import ShineOverlay from '../../comman/ShineOverlay';
+import { TAB_BAR_SPACE } from '../../../navigation/CustomTabBar';
 
 const { height, width } = Dimensions.get('window');
 
@@ -169,515 +173,590 @@ const History = (props: any) => {
       });
   }
 
-  const _renderItem = ({ item }: any) => {
-    return (
-      <View
-        style={{
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignSelf: 'baseline',
-          alignContent: 'center',
-          width: width * 0.9,
-          height: 50,
-        }}>
-        <View
-          style={{
-            backgroundColor: appTheme.NEW_PALLET,
-            height: 32,
-            width: 32,
-            borderRadius: 32 / 4,
-            alignContent: 'center',
-            justifyContent: 'center',
-            alignItems: 'center',
-            paddingHorizontal: 4,
-          }}>
-          <Icon name="inbox" size={24} color="white" />
-        </View>
-        <View
-          style={{
-            flexDirection: 'row',
-            flex: 1,
-            marginHorizontal: responsiveWidth(1.5),
-            justifyContent: 'space-between',
-          }}>
-          <View>
-            <Text
-              style={{
-                width: '100%',
-                flexWrap: 'wrap',
-                fontWeight: '400',
-                fontSize: responsiveFontSize(2),
-              }}>
-              {item.pointType}
-            </Text>
+  const [activeTab, setActiveTab] = useState<'points' | 'damage'>('points');
+  // Rejected damage entries have never been listed here; keep that behaviour.
+  const visibleDamage = (Array.isArray(damageData) ? damageData : []).filter(
+    (item: any) => item?.statusType != 'Rejected',
+  );
 
+  const formatDate = (value: any) => {
+    const d = new Date(value);
+    return isNaN(d.getTime())
+      ? ''
+      : d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  };
 
-            {/* <Text style={{fontWeight: 400, fontSize: responsiveFontSize(1.8)}}>
-              {item.pointType}
-            </Text> */}
-            <View style={{ flexDirection: 'row' }}>
-              <Text
-                style={{
-                  fontSize: responsiveFontSize(1.6),
-                  color: colors.grey,
-                }}>
-                {/* Date: {''} */}
-              </Text>
-              <Text
-                style={{ fontSize: responsiveFontSize(1.6), color: colors.grey }}>
-                {new Date(item.createdAt).toLocaleDateString().slice(0, 10)} {'  '} {`${item?.coupon ? `(` + (item?.coupon) + `)` : ''}`}
-              </Text>
-            </View>
-          </View>
-          <View>
-            <View
-              style={{
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                alignContent: 'center',
-              }}>
-              <Text
-                style={{
-                  fontSize: 16,
-                  top: 2,
-                  fontWeight: '500',
-                  color: appTheme.NEW_PALLET,
-                  marginHorizontal: responsiveWidth(2),
-                }}>
-                {item.points}
-              </Text>
-              <Image style={{ width: 20, height: 20 }} source={imagePath.RUPEE} />
-            </View>
-            <View style={{ alignItems: 'center' }}>
-              <Text
-                style={{ fontSize: responsiveFontSize(1.6), color: colors.grey }}>
-                {item.date}
-              </Text>
-            </View>
-          </View>
-        </View>
+  const toApiDate = (d: Date) =>
+    d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+
+  const statusColors = (statusType: string) => {
+    switch (statusType) {
+      case 'Approved':
+        return { bg: '#E4F6EC', fg: '#1E9E5A' };
+      case 'Rejected':
+        return { bg: '#FDECEA', fg: '#D93025' };
+      default:
+        return { bg: '#FFF1D2', fg: '#B7791F' };
+    }
+  };
+
+  const renderTransaction = (item: any, index: number) => (
+    <View key={item?._id ?? index} style={hStyles.row}>
+      <View style={[hStyles.rowIcon, { backgroundColor: '#E4F6EC' }]}>
+        <Ionicons name="arrow-down" size={18} color="#1E9E5A" />
       </View>
+      <View style={{ flex: 1, marginHorizontal: 12 }}>
+        <Text style={hStyles.rowTitle} numberOfLines={1}>
+          {item.pointType}
+        </Text>
+        <Text style={hStyles.rowMeta} numberOfLines={1}>
+          {formatDate(item.createdAt)}
+          {item?.coupon ? `  •  ${item.coupon}` : ''}
+        </Text>
+      </View>
+      <View style={hStyles.pointsPill}>
+        <Text style={hStyles.pointsText}>+{item.points}</Text>
+        <Image style={{ width: 16, height: 16, marginLeft: 4 }} source={imagePath.RUPEE} />
+      </View>
+    </View>
+  );
+
+  const renderDamage = (item: any, index: number) => {
+    const c = statusColors(item?.statusType);
+    return (
+      <Pressable
+        key={item?._id ?? index}
+        style={hStyles.row}
+        onPress={() => {
+          if (item?.statusType == 'Rejected') {
+            setItemSelect(item);
+            actionSheetRef.current?.show();
+          }
+        }}>
+        <View style={[hStyles.rowIcon, { backgroundColor: '#FDECEA' }]}>
+          <Ionicons name="warning-outline" size={18} color="#D93025" />
+        </View>
+        <View style={{ flex: 1, marginHorizontal: 12 }}>
+          <Text style={hStyles.rowTitle}>Damage entry</Text>
+          <Text style={hStyles.rowMeta} numberOfLines={1}>
+            {formatDate(item.createdAt)}
+            {item?.couponCode ? `  •  ${item.couponCode}` : ''}
+          </Text>
+        </View>
+        <View style={[hStyles.statusPill, { backgroundColor: c.bg }]}>
+          <Text style={[hStyles.statusText, { color: c.fg }]}>{item?.statusType}</Text>
+        </View>
+      </Pressable>
     );
   };
 
-  const _DamagerenderItem = ({ item }: any) => {
-    if(item?.statusType != "Rejected"){
+  const renderDateButton = (which: 'from' | 'to') => {
+    const value = which === 'from' ? selectedDateFrom : selectedDateTo;
+    const hasValue = value && value !== 'From' && value !== 'To';
+    if (Platform.OS === 'ios') {
+      // iOS shows its own compact picker inline.
       return (
-        <TouchableOpacity
-          style={{
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            alignSelf: 'baseline',
-            alignContent: 'center',
-            width: width * 0.9,
-            height: 50,
-          }} activeOpacity={1} onPress={() => { 
-            if(item?.statusType == "Rejected"){
-              setItemSelect(item) 
-              actionSheetRef.current?.show()
-            }
-             }}>
-          <View
-            style={{
-              backgroundColor: appTheme.NEW_PALLET,
-              height: 32,
-              width: 32,
-              borderRadius: 32 / 4,
-              alignContent: 'center',
-              justifyContent: 'center',
-              alignItems: 'center',
-              paddingHorizontal: 4,
-            }}>
-            <Icon name="inbox" size={24} color="white" />
-          </View>
-          <View
-            style={{
-              flexDirection: 'row',
-              flex: 1,
-              marginHorizontal: responsiveWidth(1.5),
-              justifyContent: 'space-between',
-            }}>
-            <View>
-              <Text
-                style={{
-                  width: '100%',
-                  flexWrap: 'wrap',
-                  fontWeight: '400',
-                  fontSize: responsiveFontSize(2),
-                }}>
-                {"Damage entry"}
-              </Text>
-  
-  
-              {/* <Text style={{fontWeight: 400, fontSize: responsiveFontSize(1.8)}}>
-                {item.pointType}
-              </Text> */}
-              <View style={{ flexDirection: 'row' }}>
-                <Text
-                  style={{
-                    fontSize: responsiveFontSize(1.6),
-                    color: colors.grey,
-                  }}>
-                  {/* Date: {''} */}
-                </Text>
-                <Text
-                  style={{ fontSize: responsiveFontSize(1.6), color: colors.grey }}>
-                  {new Date(item.createdAt).toLocaleDateString().slice(0, 10)} {'  '} {`${item?.couponCode ? `(` + (item?.couponCode) + `)` : ''}`}
-                </Text>
-              </View>
-            </View>
-            <View>
-              <View
-                style={{
-                  flexDirection: 'row',
-                  justifyContent: 'space-between',
-                  alignContent: 'center',
-                  backgroundColor: item?.statusType == "Rejected" ? 'red' : 'orange',
-                  paddingHorizontal: 5,
-                  paddingVertical: 4,
-                  borderRadius: 8
-                }}>
-                <Text
-                  style={{
-                    fontSize: 16,
-                    fontWeight: '500',
-                    color: 'white',
-                  }}>
-                  {item?.statusType}
-                </Text>
-  
-              </View>
-              <View style={{ alignItems: 'center' }}>
-                <Text
-                  style={{ fontSize: responsiveFontSize(1.6), color: colors.grey }}>
-                  {item.date}
-                </Text>
-              </View>
-            </View>
-          </View>
-        </TouchableOpacity>
+        <View style={hStyles.dateBox}>
+          <Text style={hStyles.dateLabel}>{which === 'from' ? 'From' : 'To'}</Text>
+          <DateTimePicker
+            value={hasValue ? new Date(value) : new Date()}
+            mode="date"
+            display="compact"
+            maximumDate={new Date()}
+            onChange={(event: any, selected?: Date) => {
+              if (!selected) {
+                return;
+              }
+              which === 'from'
+                ? setSelectedDateFrom(toApiDate(selected))
+                : setSelectedDateTo(toApiDate(selected));
+            }}
+          />
+        </View>
       );
     }
+    return (
+      <Pressable
+        style={hStyles.dateBox}
+        onPress={() => {
+          which === 'from' ? setSelectedDateFrom('From') : setSelectedDateTo('To');
+          setShow(true);
+        }}>
+        <Text style={hStyles.dateLabel}>{which === 'from' ? 'From' : 'To'}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Text style={[hStyles.dateValue, !hasValue && { color: '#A0A0A0' }]}>
+            {hasValue ? value : 'Select'}
+          </Text>
+          <Ionicons name="calendar-outline" size={16} color="#6B6B6B" style={{ marginLeft: 6 }} />
+        </View>
+      </Pressable>
+    );
   };
-  return (
-    <View style={styles.safeAreaView}>
-      <HeaderRNE
-           backgroundColor="white"
-           backgroundImageStyle={{}}
-           barStyle="dark-content"
-        centerComponent={{
-          text: `${t('transaction')}`,
-          style: {
-            color: 'black',
-            fontSize: 19,
-            justifyContent: 'center',
-            alignContent: 'center',
-            alignSelf: 'center',
-            alignItems: 'center',
-          },
-        }}
-        centerContainerStyle={{ height: 28, justifyContent: 'center' }}
-        leftComponent={
-          <TouchableOpacity
-            containerStyle={{ padding: 5 }}
-            onPress={() => props.navigation.goBack()}>
-            <Ionicons name="chevron-back" size={25} color={'black'} />
-          </TouchableOpacity>
-        }
-        leftContainerStyle={{ paddingLeft: 9 }}
-        linearGradientProps={{}}
-        placement="center"
-        rightContainerStyle={{}}
-        statusBarProps={{}}
-        containerStyle={{
-          bottom: Platform.OS === "android"
-            ? Platform.OS === "android" && Platform.Version <= 34
-              ?0
-              : height * 0.04
-            : 0
-        }}
-      />
-      <ScrollView>
-      <View>
-        {/* <View style={{alignSelf: 'baseline'}}> */}
-        <Card
-          containerStyle={{
-            width: width - 30,
-            backgroundColor: appTheme.NEW_PALLET,
-            borderRadius: 18,
-          }}>
-          <View>
-            <View
-              style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <View
-                style={{
-                  padding: 10,
-                }}>
-                <Text style={{ fontWeight: '700', fontSize: 20, color: 'white' }}>
-                  {`${t('balance')}`}
-                </Text>
-                <Text style={{ fontWeight: '700', fontSize: 32, color: 'white' }}>
-                  {balancePoint}
-                </Text>
-              </View>
-              <DashedLine
-                axis="vertical"
-                dashColor="white"
-                dashLength={4}
-                dashGap={3}
-                style={{ paddingLeft: 70 }}
-              />
 
-              <View
-                style={{
-                  padding: 10,
-                }}>
-                <View style={{ alignSelf: 'baseline', width: width / 2 }}>
-                  <Text
-                    style={{
-                      fontWeight: '700',
-                      fontSize: 20,
-                      color: 'white',
-                    }}>
-                    {`${t('totalearned')}`}
-                  </Text>
-                </View>
-                <Text style={{ fontWeight: '700', fontSize: 32, color: 'white' }}>
-                  {balancePoint + RedeemPoints}
-                </Text>
-              </View>
+  return (
+    // White behind the status bar so it blends with the header; the page itself is grey.
+    <View style={{ flex: 1, backgroundColor: 'white' }}>
+      <View style={hStyles.header}>
+        <Pressable
+          onPress={() => props.navigation.goBack()}
+          hitSlop={6}
+          style={({ pressed }) => [hStyles.headerButton, pressed && { opacity: 0.6 }]}>
+          <Ionicons name="chevron-back" size={22} color={appTheme.DARK_BOTTOMTAB} />
+        </Pressable>
+        <Text style={hStyles.headerTitle}>{`${t('transaction')}`}</Text>
+        <View style={{ width: 40 }} />
+      </View>
+
+      <ScrollView
+        style={{ backgroundColor: '#F7F7F7' }}
+        contentContainerStyle={{ paddingBottom: TAB_BAR_SPACE }}
+        showsVerticalScrollIndicator={false}>
+        {/* Summary */}
+        <LinearGradient
+          colors={['#2B2829', appTheme.DARK_BOTTOMTAB, '#4A4344']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={hStyles.summary}>
+          <View style={hStyles.summaryDecor} />
+          <ShineOverlay />
+          <Text style={hStyles.summaryLabel}>{`${t('balance')}`}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+            <Ionicons name="star" size={22} color={appTheme.NEW_PALLET} />
+            <Text style={hStyles.summaryValue}>{balancePoint}</Text>
+            <Text style={hStyles.summaryUnit}>pts</Text>
+          </View>
+          <View style={hStyles.statsRow}>
+            <View style={hStyles.stat}>
+              <Text style={hStyles.statLabel}>{`${t('totalearned')}`}</Text>
+              <Text style={hStyles.statValue}>{balancePoint + RedeemPoints}</Text>
             </View>
-            <DashedLine
-              axis="horizontal"
-              dashColor="white"
-              dashLength={4}
-              dashGap={3}
-            />
-            <View
-              style={{
-                paddingTop: 20,
-                flexDirection: 'row',
-                alignContent: 'flex-end',
-                justifyContent: 'flex-end',
-                padding: 5,
-              }}>
-              <Button
-                type={'solid'}
-                title={`${t('couponscan')}`}
-                titleStyle={{ color: 'black', padding: 10 }}
-                icon={<MI name="qr-code-scanner" color={'black'} size={20} />}
-                iconPosition={'right'}
-                iconContainerStyle={{ margin: 2 }}
-                buttonStyle={{ backgroundColor: 'white' }}
-                containerStyle={{ borderRadius: 24 }}
-                onPress={() => {
-                  navigation.navigate(navigationStrings.COUPON_SCAN);
-                }}
-              />
+            <View style={hStyles.statDivider} />
+            <View style={hStyles.stat}>
+              <Text style={hStyles.statLabel}>Redeemed</Text>
+              <Text style={hStyles.statValue}>{RedeemPoints || 0}</Text>
             </View>
           </View>
-        </Card>
-        {/* </View> */}
+          <Pressable
+            onPress={() => navigation.navigate(navigationStrings.COUPON_SCAN)}
+            style={({ pressed }) => [hStyles.scanButton, pressed && { opacity: 0.85 }]}>
+            <MI name="qr-code-scanner" color={appTheme.DARK_BOTTOMTAB} size={20} />
+            <Text style={hStyles.scanButtonText}>{`${t('couponscan')}`}</Text>
+          </Pressable>
+        </LinearGradient>
 
-        <View style={{ paddingVertical: 10 }}>
-          <DashedLine dashColor="grey" dashLength={3} dashThickness={1} />
+        {/* Tabs + filter */}
+        <View style={hStyles.toolbar}>
+          <View style={hStyles.segment}>
+            {(['points', 'damage'] as const).map(tab => (
+              <Pressable
+                key={tab}
+                onPress={() => setActiveTab(tab)}
+                style={[hStyles.segmentItem, activeTab === tab && hStyles.segmentItemActive]}>
+                <Text style={[hStyles.segmentText, activeTab === tab && hStyles.segmentTextActive]}>
+                  {tab === 'points' ? `${t('history')}` : 'Damage Reports'}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+          <Pressable
+            onPress={() => setFilterData(!filterData)}
+            style={[hStyles.filterButton, filterData && hStyles.filterButtonActive]}>
+            <Ionicons
+              name={filterData ? 'close' : 'options-outline'}
+              size={18}
+              color={filterData ? 'white' : appTheme.DARK_BOTTOMTAB}
+            />
+          </Pressable>
         </View>
-        {/* <View
-          style={{
-            marginHorizontal: responsiveWidth(4),
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            marginVertical: 10,
-          }}> */}
-        <Text
-          style={{
-            paddingTop: 10,
-            marginHorizontal: responsiveWidth(4),
-            paddingBottom: 10,
-            fontWeight: '500',
-            fontSize: 16,
-            textDecorationLine: 'underline',
-          }}>
-          {`${t('history')}`}
-        </Text>
-        {/* </View> */}
-        <ScrollView showsVerticalScrollIndicator={true}>
-          <TouchableOpacity style={styles.filterContainer} onPress={() => setFilterData(true)}>
-            <View style={{ flexDirection: 'row', }}>
-              <FilterIcon style={{ alignSelf: 'center' }} />
-              <Text style={styles.filterText}>Filter</Text>
+
+        {filterData && (
+          <View style={hStyles.filterCard}>
+            <Text style={hStyles.filterTitle}>Date Range</Text>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              {renderDateButton('from')}
+              {renderDateButton('to')}
             </View>
-            {
-              filterData == true && (
-                <TouchableOpacity onPress={() => setFilterData(false)}>
-                  <CloseIcon />
-                </TouchableOpacity>
-              )
-            }
-            {console.log(itemSelect)}
-          </TouchableOpacity>
-          {
-            filterData && (
-              <View style={styles.filterTouchView}>
-                <Text style={styles.daterangeText}>Date Range</Text>
-                <View style={styles.monthContainer}>
-                  {
-                    Platform.OS == 'android' && (
-                      <>
-                        <View style={{ width: '49%' }}>
-                          <TouchableOpacity style={[styles.dateContainer, { paddingHorizontal: 10 }]} onPress={() => {
-                            setSelectedDateFrom('From');
-                            setShow(true)
-                          }}>
-                            <Text style={[styles.dateText2, { opacity: selectedDateFrom == undefined ? 0.7 : 1 }]}>{selectedDateFrom == undefined ? 'From' : selectedDateFrom}</Text>
-                            <BlackCalendarIcon />
-                          </TouchableOpacity>
-                        </View>
-                        <View style={{ width: '49%' }}>
-                          <TouchableOpacity style={[styles.dateContainer, { paddingHorizontal: 10 }]} onPress={() => {
-                            setShow(true)
-                            setSelectedDateTo('To')
-                          }}>
-                            <Text style={[styles.dateText2, { opacity: selectedDateTo == undefined ? 0.7 : 1 }]}>{selectedDateTo == undefined ? 'To' : selectedDateTo}</Text>
-                            <BlackCalendarIcon />
-                          </TouchableOpacity>
-                        </View>
-                      </>
-                    )
-                  }
+            <Pressable
+              style={({ pressed }) => [hStyles.applyButton, pressed && { opacity: 0.85 }]}
+              onPress={() => {
+                FilterSubmit();
+                DamageEntry();
+                setFilterData(false);
+              }}>
+              <Text style={hStyles.applyText}>Apply Filter</Text>
+            </Pressable>
+          </View>
+        )}
 
+        {/* List */}
+        <View style={hStyles.listCard}>
+          {activeTab === 'points' ? (
+            Array.isArray(transactionData) && transactionData.length ? (
+              transactionData.map((item: any, index: number) => (
+                <View key={item?._id ?? index}>
+                  {index > 0 ? <View style={hStyles.divider} /> : null}
+                  {renderTransaction(item, index)}
                 </View>
-
-                <LinearGradient colors={['orange', 'orange']}
-                  style={[styles.submitButton]}>
-                  <TouchableOpacity style={[styles.submitButton]}
-                    onPress={() => {
-                      FilterSubmit()
-                      DamageEntry()
-                      setFilterData(false)
-                    }}>
-                    <Text style={styles.text}>{'Submit'}</Text>
-                  </TouchableOpacity>
-                </LinearGradient>
+              ))
+            ) : (
+              <View style={hStyles.empty}>
+                <Ionicons name="receipt-outline" size={34} color="#C9C9C9" />
+                <Text style={hStyles.emptyText}>No transactions yet</Text>
+                <Text style={hStyles.emptySub}>Scan a QR code to start earning points</Text>
               </View>
             )
-          }
-          <View style={{ flex: 2 }}>
-            <View
-              style={{
-                marginHorizontal: responsiveWidth(3),
-                padding: 6,
-                overflow: 'hidden',
-              }}>
-              <FlatList
-                data={transactionData}
-                renderItem={_renderItem}
-                contentContainerStyle={{}}
-              />
+          ) : visibleDamage.length ? (
+            visibleDamage.map((item: any, index: number) => (
+              <View key={item?._id ?? index}>
+                {index > 0 ? <View style={hStyles.divider} /> : null}
+                {renderDamage(item, index)}
+              </View>
+            ))
+          ) : (
+            <View style={hStyles.empty}>
+              <Ionicons name="shield-checkmark-outline" size={34} color="#C9C9C9" />
+              <Text style={hStyles.emptyText}>No damage reports</Text>
             </View>
-            <View style={{ paddingVertical: 10, }}>
-              <DashedLine dashColor="grey" dashLength={3} dashThickness={1} />
-            </View>
-            <Text
-              style={{
-                paddingTop: 10,
-                marginHorizontal: responsiveWidth(4),
-                paddingBottom: 10,
-                fontWeight: '500',
-                fontSize: 16,
-                textDecorationLine: 'underline',
-              }}>
-              {`Damage coupon history`}
-            </Text>
-            <View
-              style={{
-                marginHorizontal: responsiveWidth(3),
-                padding: 6,
-                overflow: 'hidden',
-              }}>
-              <FlatList
-                data={damageData}
-                renderItem={_DamagerenderItem}
-                contentContainerStyle={{}}
-              />
-            </View>
-          </View>
-          <View style={{ height: 200 }} />
-        </ScrollView>
-        {
-          Platform.OS == 'android' && (
-            <>
-              {show && (
-                <DateTimePicker
-                  testID='dateTimePicker'
-                  value={date}
-                  mode={mode}
-                  is24Hour={true}
-                  display='default'
-                  onChange={(event, selectedDate) => onChange3(event, selectedDate)}
-
-                />
-              )}
-            </>
-          )
-        }
-      </View>
-      <ActionSheet ref={actionSheetRef} >
-        <View style={{ paddingTop: 15 }}>
-          <Text
-            style={{
-              paddingTop: 10,
-              marginHorizontal: responsiveWidth(4),
-              paddingBottom: 10,
-              fontWeight: '700',
-              fontSize: 20,
-              color: 'black',
-              textDecorationLine: 'underline',
-            }}>
-            {`Damage coupon details`}
-          </Text>
-          <View>
-            <Text
-              style={{
-                paddingTop: 5,
-                marginHorizontal: responsiveWidth(4),
-                paddingBottom: 10,
-                fontWeight: '700',
-                fontSize: 15,
-                color: 'black',
-                textDecorationLine: 'underline',
-              }}>
-              {`Coupon code`}{':'}  {itemSelect?.couponCode}
-            </Text>
-            <Text
-              style={{
-                paddingTop: 5,
-                marginHorizontal: responsiveWidth(4),
-                paddingBottom: 10,
-                fontWeight: '700',
-                fontSize: 15,
-                color: 'black',
-                textDecorationLine: 'underline',
-              }}>
-              {`Remark`}{':'}  {itemSelect?.remark}
-            </Text>
-          </View>
-          <LinearGradient colors={['orange', 'orange']}
-            style={[styles.submitButton,{height: 35}]}>
-            <TouchableOpacity style={[styles.submitButton]}
-              onPress={() => {
-                actionSheetRef.current?.hide()
-              }}>
-              <Text style={styles.text}>{'ok'}</Text>
-            </TouchableOpacity>
-          </LinearGradient>
+          )}
         </View>
-        <View style={{ height: 35 }} />
-      </ActionSheet>
       </ScrollView>
+
+      {Platform.OS == 'android' && show && (
+        <DateTimePicker
+          testID="dateTimePicker"
+          value={date}
+          mode={mode}
+          is24Hour={true}
+          display="default"
+          onChange={(event, selectedDate) => onChange3(event, selectedDate)}
+        />
+      )}
+
+      <ActionSheet ref={actionSheetRef} containerStyle={{ borderTopLeftRadius: 24, borderTopRightRadius: 24 }}>
+        <View style={{ padding: 20 }}>
+          <Text style={hStyles.sheetTitle}>Damage coupon details</Text>
+          <View style={hStyles.sheetRow}>
+            <Text style={hStyles.sheetLabel}>Coupon code</Text>
+            <Text style={hStyles.sheetValue}>{itemSelect?.couponCode || '-'}</Text>
+          </View>
+          <View style={hStyles.sheetRow}>
+            <Text style={hStyles.sheetLabel}>Remark</Text>
+            <Text style={hStyles.sheetValue}>{itemSelect?.remark || '-'}</Text>
+          </View>
+          <Pressable
+            style={[hStyles.applyButton, { marginTop: 18 }]}
+            onPress={() => actionSheetRef.current?.hide()}>
+            <Text style={hStyles.applyText}>OK</Text>
+          </Pressable>
+        </View>
+      </ActionSheet>
     </View>
   );
 };
+
+const hStyles = StyleSheet.create({
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'white',
+    paddingHorizontal: 16,
+    paddingTop: 6,
+    paddingBottom: 12,
+    borderBottomLeftRadius: 22,
+    borderBottomRightRadius: 22,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 4,
+    zIndex: 2,
+  },
+  headerButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#F4F4F4',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1C1C1C',
+  },
+  summary: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 22,
+    padding: 20,
+    overflow: 'hidden',
+  },
+  summaryDecor: {
+    position: 'absolute',
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    right: -70,
+    top: -90,
+    backgroundColor: 'rgba(247,209,133,0.12)',
+  },
+  summaryLabel: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.7)',
+    fontWeight: '600',
+  },
+  summaryValue: {
+    fontSize: 38,
+    fontWeight: '800',
+    color: 'white',
+    marginLeft: 8,
+  },
+  summaryUnit: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.6)',
+    marginLeft: 6,
+    marginTop: 12,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    marginTop: 16,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 14,
+    paddingVertical: 12,
+  },
+  stat: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statDivider: {
+    width: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+  },
+  statLabel: {
+    fontSize: 11.5,
+    color: 'rgba(255,255,255,0.65)',
+  },
+  statValue: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: appTheme.NEW_PALLET,
+    marginTop: 2,
+  },
+  scanButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 16,
+    backgroundColor: appTheme.NEW_PALLET,
+    borderRadius: 14,
+    paddingVertical: 12,
+  },
+  scanButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: appTheme.DARK_BOTTOMTAB,
+    marginLeft: 8,
+  },
+  toolbar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 16,
+    marginTop: 20,
+  },
+  segment: {
+    flex: 1,
+    flexDirection: 'row',
+    backgroundColor: '#ECECEC',
+    borderRadius: 14,
+    padding: 4,
+  },
+  segmentItem: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 9,
+    borderRadius: 11,
+  },
+  segmentItemActive: {
+    backgroundColor: 'white',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  segmentText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#8A8A8A',
+  },
+  segmentTextActive: {
+    color: '#1C1C1C',
+    fontWeight: '700',
+  },
+  filterButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: 'white',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 10,
+    borderWidth: 1,
+    borderColor: '#E6E6E6',
+  },
+  filterButtonActive: {
+    backgroundColor: appTheme.DARK_BOTTOMTAB,
+    borderColor: appTheme.DARK_BOTTOMTAB,
+  },
+  filterCard: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    backgroundColor: 'white',
+    borderRadius: 18,
+    padding: 14,
+  },
+  filterTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1C1C1C',
+    marginBottom: 10,
+  },
+  dateBox: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.12)',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    alignItems: 'flex-start',
+  },
+  dateLabel: {
+    fontSize: 11,
+    color: '#8A8A8A',
+    marginBottom: 4,
+  },
+  dateValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1C1C1C',
+  },
+  applyButton: {
+    marginTop: 14,
+    height: 46,
+    borderRadius: 14,
+    backgroundColor: appTheme.NEW_PALLET,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  applyText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: appTheme.DARK_BOTTOMTAB,
+  },
+  listCard: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    backgroundColor: 'white',
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  rowIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rowTitle: {
+    fontSize: 14.5,
+    fontWeight: '600',
+    color: '#1C1C1C',
+  },
+  rowMeta: {
+    fontSize: 12,
+    color: '#8A8A8A',
+    marginTop: 3,
+  },
+  pointsPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E4F6EC',
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  pointsText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1E9E5A',
+  },
+  statusPill: {
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: '#E6E6E6',
+    marginLeft: 52,
+  },
+  empty: {
+    alignItems: 'center',
+    paddingVertical: 30,
+  },
+  emptyText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6B6B6B',
+    marginTop: 8,
+  },
+  emptySub: {
+    fontSize: 12,
+    color: '#9A9A9A',
+    marginTop: 2,
+  },
+  sheetTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1C1C1C',
+    marginBottom: 12,
+  },
+  sheetRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E6E6E6',
+  },
+  sheetLabel: {
+    fontSize: 13,
+    color: '#8A8A8A',
+  },
+  sheetValue: {
+    flex: 1,
+    textAlign: 'right',
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1C1C1C',
+    marginLeft: 12,
+  },
+});
 
 export default History;
 

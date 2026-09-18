@@ -47,12 +47,36 @@ export const requestLocationPermission =
     }
 
     return new Promise(resolve => {
+      let settled = false;
+      const done = (status: LocationPermissionStatus) => {
+        if (!settled) {
+          settled = true;
+          resolve(status);
+        }
+      };
+
+      // On iOS these callbacks only fire when the authorization status
+      // *changes*. If the user already answered (e.g. during the warm-up on
+      // mount) they never fire, so the probe below settles the promise.
       Geolocation.requestAuthorization(
-        () => resolve('granted'),
+        () => done('granted'),
         error => {
           console.log('Location permission error >>> ', error);
-          resolve('blocked');
+          done('blocked');
         },
+      );
+
+      // getCurrentPosition fails right away with PERMISSION_DENIED (code 1)
+      // when access is denied. Any other outcome means we are allowed to try.
+      Geolocation.getCurrentPosition(
+        () => done('granted'),
+        error => {
+          console.log('Location permission probe >>> ', error);
+          done(error?.code === 1 ? 'blocked' : 'granted');
+        },
+        // Keep every option finite: Infinity can't cross the RN bridge and
+        // crashes with "Malformed calls from JS".
+        {enableHighAccuracy: false, timeout: 30000, maximumAge: 60000},
       );
     });
   };
@@ -61,7 +85,11 @@ export const requestLocationPermission =
  * Reads the current position. Assumes the permission is already granted.
  * Resolves with null instead of rejecting so callers stay on one path.
  */
-export const getCurrentCoordinates = (): Promise<UserCoordinates | null> =>
+const readPosition = (options: {
+  enableHighAccuracy: boolean;
+  timeout: number;
+  maximumAge: number;
+}): Promise<UserCoordinates | null> =>
   new Promise(resolve => {
     Geolocation.getCurrentPosition(
       position => {
@@ -73,9 +101,30 @@ export const getCurrentCoordinates = (): Promise<UserCoordinates | null> =>
         console.log('Get location error >>> ', error);
         resolve(null);
       },
-      {enableHighAccuracy: true, timeout: 20000, maximumAge: 10000},
+      options,
     );
   });
+
+/**
+ * Tries a precise GPS fix first. GPS often can't get a fix indoors, so when
+ * that fails we fall back to a coarse (Wi-Fi / cell) or recently cached fix.
+ */
+export const getCurrentCoordinates =
+  async (): Promise<UserCoordinates | null> => {
+    const precise = await readPosition({
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 10000,
+    });
+    if (precise) {
+      return precise;
+    }
+    return readPosition({
+      enableHighAccuracy: false,
+      timeout: 15000,
+      maximumAge: 300000,
+    });
+  };
 
 /**
  * Permission + position in one call.

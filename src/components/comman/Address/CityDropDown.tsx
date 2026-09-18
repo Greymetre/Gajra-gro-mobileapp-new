@@ -1,5 +1,6 @@
 import React, {useState, useEffect} from 'react';
 import {Dropdown} from 'react-native-element-dropdown';
+import {pickerListProps} from './dropdownTheme';
 import {requestGetCityList} from '../../../services/backend_helper';
 import {Dimensions} from 'react-native';
 const {height, width} = Dimensions.get('window');
@@ -33,19 +34,13 @@ const CityDropDown = (props: any) => {
         borderWidth: 1,
         borderRadius: 8,
         // borderBottomColor:
+        // Optional override, e.g. to fit inside a card.
+        ...(props.dropdownStyle || {}),
       }}
-      selectedTextStyle={{color: 'black'}}
-      containerStyle={{borderRadius: 8}}
       selectedTextProps={{selectionColor: 'black'}}
-      itemTextStyle={{paddingLeft: 10}}
-      inputSearchStyle={{
-        height: 40,
-        // fontSize: 16,
-      }}
-      dropdownPosition={'top'}
-      showsVerticalScrollIndicator={true}
       search
       data={cityData}
+      {...pickerListProps({selectedValue: city, searchPlaceholder: 'Search city', icon: 'business-outline'})}
       labelField="label"
       valueField="value"
       placeholder={`${t('select')} ${t('city')}`}

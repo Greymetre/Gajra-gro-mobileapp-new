@@ -19,7 +19,7 @@
 require_relative '../node_modules/react-native/scripts/react_native_pods'
 require_relative '../node_modules/react-native-permissions/scripts/setup'
 
-platform :ios, min_ios_version_supported
+platform :ios, '15.1'
 # use_modular_headers!
 prepare_react_native_project!
 
@@ -80,5 +80,15 @@ target 'GajraGearsMLP' do
       :mac_catalyst_enabled => false,
       # :ccache_enabled => true
     )
+
+    # Xcode 26+/27 only supports iOS 15.0+; force all pods to a supported target
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |config|
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.1'
+      end
+    end
+    installer.pods_project.build_configurations.each do |config|
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.1'
+    end
   end
 end

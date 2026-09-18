@@ -5,6 +5,7 @@ import styles from '../../comman/Picker/styles';
 import {launchCamera, launchImageLibrary} from 'react-native-image-picker';
 import ImagePicker from 'react-native-image-crop-picker';
 import {ModalAlertPopup} from '../ModalAlertPopup';
+import {showImagePickerError} from '../../bottomtabs/profile/permission';
 
 const Picker = (props: any) => {
   // const Picker = ({label, camera, camera_title}) => {
@@ -24,7 +25,7 @@ const Picker = (props: any) => {
         props.onSelecet(image.path);
       })
       .catch((errors: any) => {
-        console.log('Selected Image by Crop Catch >>>>>     ', errors);
+        showImagePickerError(errors);
       });
   }
   function byGallery() {
@@ -39,7 +40,7 @@ const Picker = (props: any) => {
         props.onSelecet(image.path);
       })
       .catch((errors: any) => {
-        console.log('Selected Image by Crop Catch >>>>>     ', errors);
+        showImagePickerError(errors);
       });
   }
 

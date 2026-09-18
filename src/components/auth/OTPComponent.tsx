@@ -1,12 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Alert,
   Dimensions,
   Pressable,
-  SafeAreaView,
   StyleSheet,
   Text,
+  TextInput,
   View,
+  Platform,
+  ActivityIndicator,
 } from 'react-native';
 import appTheme from '../../utils/appTheme';
 import * as Yup from 'yup';
@@ -206,7 +208,7 @@ const OTPComponent = (props: any) => {
         otp: formik.values.password,
         appVersion: appliationversion,
         deviceToken: `${fcmToken}`,
-        deviceType: 'android',
+        deviceType: Platform.OS,
         deviceName: temp1,
       };
     } else {
@@ -215,7 +217,7 @@ const OTPComponent = (props: any) => {
         otp: formik.values.password,
         appVersion: appliationversion,
         deviceToken: `${fcmToken}`,
-        deviceType: 'android',
+        deviceType: Platform.OS,
         deviceName: temp1,
       };
     }
@@ -306,255 +308,333 @@ const OTPComponent = (props: any) => {
     enableReinitialize: false,
   });
 
+  const otpInputRef = useRef<TextInput>(null);
+  const otpDigits = (formik.values.password || '').split('');
+  const phoneLocked = mobileInput;
+
   return (
-    <SafeAreaView style={{ backgroundColor: appTheme.APP_BACKGROUND_COLOR }}>
-      <View>
-        <View>
-          <Text style={{ marginTop: 20 }}>
-            <Text style={{ color: 'black' }}>{t('phoneno')}</Text>
-            <Text style={{ color: 'red' }}>*</Text>
-          </Text>
-          <Input
-            inputContainerStyle={{
-              borderWidth: formik.values.focusUserName ? 0 : 1,
-              borderRadius: 8,
+    <View style={oStyles.card}>
+      {/* Phone number */}
+      <Text style={oStyles.label}>
+        {t('phoneno')}
+        <Text style={{ color: '#D93025' }}> *</Text>
+      </Text>
+      <View
+        style={[
+          oStyles.phoneRow,
+          phoneLocked && oStyles.phoneRowLocked,
+          formik.errors.username ? oStyles.inputError : null,
+        ]}>
+        <View style={oStyles.countryCode}>
+          <Text style={oStyles.countryCodeText}>+91</Text>
+        </View>
+        <TextInput
+          style={oStyles.phoneInput}
+          placeholder="Enter mobile number"
+          placeholderTextColor="#A0A0A0"
+          value={formik.values.username}
+          onChangeText={text => handleChangeUsername(text.replace(/[^0-9]/g, ''))}
+          keyboardType="phone-pad"
+          maxLength={10}
+          editable={!phoneLocked}
+          textContentType="telephoneNumber"
+          autoComplete="tel"
+        />
+        {phoneLocked ? (
+          <Pressable
+            hitSlop={8}
+            onPress={() => {
+              setMobileInput(false);
+              setDisableGetOTPButton(false);
             }}
-            placeholder={'Phone Number'}
-            placeholderTextColor="#CCCCCC"
-            renderErrorMessage={false}
-            value={formik.values.username}
-            onChangeText={text => handleChangeUsername(text)}
-            keyboardType="phone-pad"
-            maxLength={10}
-            rightIcon={
-              <FontAwesome
-                name="pencil-square-o"
-                size={25}
-                color={'black'}
-                onPress={() => {
-                  setMobileInput(false);
-                  setDisableGetOTPButton(false);
-                }}
-              />
-            }
-            disabled={mobileInput}
-          />
-          {/* </LinearGradient> */}
-          {formik.errors.username && (
-            <Text style={{ fontSize: 11, color: 'red' }}>
-              {formik.errors.username}
-            </Text>
-          )}
-          <View
-            style={{
-              alignContent: 'flex-end',
-              alignItems: 'flex-end',
-              justifyContent: 'flex-end',
-              alignSelf: 'flex-end',
-              width: 150,
-              paddingRight: 10,
-            }}>
-            <Button
-              title={`${t('getotp')}`}
-              onPress={() => {
-                // navigation.navigate(navigationStrings.SIGN_UP_ONE, {
-                //   mobileno: '8269268961',
-                // });
-                if (formik.values.username.length == 10) {
-                  setMobileInput(true);
-                  OTPonSubmit();
-                  setShowOTPCodeBox(true);
-                  setSeconds(30);
-                  setTimeout(() => {
-                    setResendOTPEnable(true);
-                  }, 30000);
-                } else {
-                  {
-                    formik.validateForm();
-                  }
-                }
-              }}
-              buttonStyle={{
-                backgroundColor: appTheme.NEW_PALLET,
-                borderRadius: 8,
-              }}
-              titleStyle={{ color: 'black' }}
-              containerStyle={{ paddingTop: 10 }}
-              disabled={disableGetOTPButton}
-            />
-          </View>
-          {disableGetOTPButton ? (
-            <Text
-              style={{
-                // justifyContent: 'center',
-                // alignItems: 'center',
-                // alignContent: 'center',
-                alignSelf: 'center',
-                color: 'red',
-              }}>
-              {t('otpsentmessage')}
-            </Text>
-          ) : null}
-        </View>
-        <View>
-          <View>
-            <View>
-              <View>
-                <Text style={{ color: 'black', marginTop: 20, fontSize: 14 }}>
-                  {' '}
-                  {`${t('OTP')}`}
-                </Text>
-                <View
-                  style={{
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    alignSelf: 'center',
-                  }}>
-                  <Input
-                    containerStyle={{ justifyContent: 'center', alignItems: 'center' }}
-                    // disabledInputStyle={{background: '#ddd'}}
-                    maxLength={maximumCodeLength}
-                    inputContainerStyle={{
-                      width: 160,
-                      paddingHorizontal: 5,
-                      justifyContent: 'space-evenly',
-                      alignContent: 'center',
-                      alignItems: 'center',
-                      borderColor: 'black',
-                      borderRadius: 12,
-                      borderWidth: 0.5,
-                      alignSelf: 'auto',
-                    }}
-                    value={formik.values.password}
-                    onChangeText={(otpCode: any) => {
-                      formik.setFieldValue('password', otpCode);
-                      if (formik.dirty) {
-                        setshowError(false);
-                      }
-                    }}
-                    textContentType={'oneTimeCode'}
-                    inputStyle={{
-                      letterSpacing: 21,
-                      // justifyContent: 'space-evenly',
-                    }}
-                    textAlignVertical={'center'}
-                    placeholder="****"
-                    keyboardType="number-pad"
-                  />
-                </View>
-
-                {/* <Pressable onPress={Keyboard.dismiss}> */}
-                {/* <OTPInput
-                      code={formik.values.password}
-                      setCode={(otpCode: any) =>
-                        formik.setFieldValue('password', otpCode)
-                      }
-                      maximumLength={maximumCodeLength}
-                      setIsPinReady={setIsPinReady}
-                    /> */}
-                {/* </Pressable> */}
-              </View>
-              {/* {() => {
-                  formik.setFieldValue('password', otpCode);
-                  handleChangeOTP(otpCode);
-                }} */}
-              <View>
-                {showError ? (
-                  <Text style={{ fontSize: 15, color: 'red' }}>
-                    {errMessageRes}
-                  </Text>
-                ) : null}
-                {/* {formik.errors.tempPassword && (
-                      <Text style={{fontSize: 11, color: 'red'}}>
-                        {formik.errors.tempPassword}
-                      </Text>
-                    )} */}
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    justifyContent: 'center',
-                    alignContent: 'center',
-                  }}>
-                  {seconds > 0 ? (
-                    <Text style={{ paddingHorizontal: 5 }}>
-                      {`${t('resend')}`}- 00:
-                      {seconds < 10 ? `0${seconds}` : seconds}
-                    </Text>
-                  ) : (
-                    <Text>{`${t('notrecieved')}`}</Text>
-                  )}
-                  <Pressable
-                    // disabled={seconds > 0}
-                    onPress={() => {
-                      if (seconds != 0) {
-                        setResendOTPEnable(false);
-                        console.log('seconds != 0', seconds != 0);
-                      } else if (seconds === 0) {
-                        resendOTPFunction();
-                        console.log('seconds === 0', seconds === 0);
-                        resendOTP();
-
-                        setResendOTPEnable(true);
-                      }
-
-                      // setSeconds(10);
-                      // if (seconds == 0) {
-                      //   setResendOTPEnable(true);
-                      // }
-                    }}>
-                    <Text
-                      style={[seconds == 0 ? stylesNew.black : stylesNew.grey]}>
-                      {`${t('resend')} ${t('OTP')}`}
-                    </Text>
-                  </Pressable>
-                </View>
-
-                <View style={{ paddingTop: 10 }}>
-                  <Button
-                    title={`${t('submit')}`}
-                    loading={formik.values.isClicked}
-                    onPress={() => {
-                      formik.handleSubmit();
-                      // navigation.navigate(navigationStrings.SIGN_UP_ONE, {
-                      //   mobileno: '9876543210',
-                      // });
-                    }}
-                    buttonStyle={{
-                      backgroundColor: appTheme.NEW_PALLET,
-                      borderRadius: 8,
-                    }}
-                    disabled={formik.values.isClicked ? true : !formik.isValid}
-                    titleStyle={{ color: 'black' }}
-                    containerStyle={{ paddingTop: 10 }}
-                  />
-                </View>
-              </View>
-            </View>
-          </View>
-        </View>
+            style={oStyles.editButton}>
+            <FontAwesome name="pencil" size={14} color={appTheme.DARK_BOTTOMTAB} />
+            <Text style={oStyles.editText}>Edit</Text>
+          </Pressable>
+        ) : null}
       </View>
-    </SafeAreaView>
+      {formik.errors.username ? (
+        <Text style={oStyles.errorText}>{String(formik.errors.username)}</Text>
+      ) : null}
+
+      <Pressable
+        disabled={disableGetOTPButton}
+        onPress={() => {
+          if (formik.values.username.length == 10) {
+            setMobileInput(true);
+            OTPonSubmit();
+            setShowOTPCodeBox(true);
+            setSeconds(30);
+            setTimeout(() => {
+              setResendOTPEnable(true);
+            }, 30000);
+            setTimeout(() => otpInputRef.current?.focus(), 400);
+          } else {
+            formik.validateForm();
+          }
+        }}
+        style={({ pressed }) => [
+          oStyles.otpButton,
+          disableGetOTPButton && oStyles.otpButtonSent,
+          pressed && { opacity: 0.85 },
+        ]}>
+        <FontAwesome
+          name={disableGetOTPButton ? 'check-circle' : 'send'}
+          size={15}
+          color={disableGetOTPButton ? '#1E9E5A' : 'white'}
+        />
+        <Text style={[oStyles.otpButtonText, disableGetOTPButton && { color: '#1E9E5A' }]}>
+          {disableGetOTPButton ? `${t('otpsentmessage')}` : `${t('getotp')}`}
+        </Text>
+      </Pressable>
+
+      {/* OTP boxes: one hidden input drives four display boxes */}
+      <Text style={[oStyles.label, { marginTop: 22 }]}>{`${t('OTP')}`}</Text>
+      <Pressable style={oStyles.otpRow} onPress={() => otpInputRef.current?.focus()}>
+        {[0, 1, 2, 3].map(i => {
+          const active = i === otpDigits.length && otpDigits.length < maximumCodeLength;
+          return (
+            <View
+              key={i}
+              style={[
+                oStyles.otpBox,
+                otpDigits[i] ? oStyles.otpBoxFilled : null,
+                active ? oStyles.otpBoxActive : null,
+                showError ? oStyles.inputError : null,
+              ]}>
+              <Text style={oStyles.otpDigit}>{otpDigits[i] || ''}</Text>
+            </View>
+          );
+        })}
+        <TextInput
+          ref={otpInputRef}
+          style={oStyles.hiddenOtpInput}
+          maxLength={maximumCodeLength}
+          value={formik.values.password}
+          onChangeText={(code: string) => {
+            formik.setFieldValue('password', code.replace(/[^0-9]/g, ''));
+            if (formik.dirty) {
+              setshowError(false);
+            }
+          }}
+          textContentType="oneTimeCode"
+          autoComplete="sms-otp"
+          keyboardType="number-pad"
+          caretHidden
+        />
+      </Pressable>
+
+      {showError ? <Text style={[oStyles.errorText, { textAlign: 'center' }]}>{errMessageRes}</Text> : null}
+
+      <View style={oStyles.resendRow}>
+        {seconds > 0 ? (
+          <Text style={oStyles.resendText}>
+            {`${t('resend')}`} in{' '}
+            <Text style={{ fontWeight: '700', color: '#1C1C1C' }}>
+              00:{seconds < 10 ? `0${seconds}` : seconds}
+            </Text>
+          </Text>
+        ) : (
+          <Text style={oStyles.resendText}>{`${t('notrecieved')}`}</Text>
+        )}
+        <Pressable
+          hitSlop={8}
+          onPress={() => {
+            if (seconds != 0) {
+              setResendOTPEnable(false);
+            } else if (seconds === 0) {
+              resendOTPFunction();
+              resendOTP();
+              setResendOTPEnable(true);
+            }
+          }}>
+          <Text style={[oStyles.resendLink, seconds > 0 && { color: '#B5B5B5' }]}>
+            {`${t('resend')} ${t('OTP')}`}
+          </Text>
+        </Pressable>
+      </View>
+
+      <Pressable
+        disabled={formik.values.isClicked ? true : !formik.isValid}
+        onPress={() => formik.handleSubmit()}
+        style={({ pressed }) => [
+          oStyles.submitButton,
+          (formik.values.isClicked || !formik.isValid) && oStyles.submitDisabled,
+          pressed && { transform: [{ scale: 0.98 }] },
+        ]}>
+        {formik.values.isClicked ? (
+          <ActivityIndicator color={appTheme.DARK_BOTTOMTAB} />
+        ) : (
+          <>
+            <Text style={oStyles.submitText}>{`${t('submit')}`}</Text>
+            <FontAwesome name="arrow-right" size={15} color={appTheme.DARK_BOTTOMTAB} style={{ marginLeft: 8 }} />
+          </>
+        )}
+      </Pressable>
+    </View>
   );
 };
 
-export default OTPComponent;
-
-const stylesNew = StyleSheet.create({
-  black: {
-    color: 'black',
-    justifyContent: 'flex-end',
-    alignItems: 'flex-end',
-    alignSelf: 'flex-end',
-    fontWeight: 600,
-    paddingHorizontal: 5,
-    textDecorationLine: 'underline',
+const oStyles = StyleSheet.create({
+  card: {
+    backgroundColor: 'white',
+    borderRadius: 22,
+    padding: 18,
+    marginTop: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.07,
+    shadowRadius: 12,
+    elevation: 3,
   },
-  grey: {
-    color: 'grey',
-    paddingHorizontal: 5,
-    justifyContent: 'flex-end',
-    alignItems: 'flex-end',
-    alignSelf: 'flex-end',
+  label: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1C1C1C',
+    marginBottom: 8,
+  },
+  phoneRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(0,0,0,0.12)',
+    borderRadius: 14,
+    height: 54,
+    paddingRight: 10,
+    backgroundColor: 'white',
+    overflow: 'hidden',
+  },
+  phoneRowLocked: {
+    backgroundColor: '#F7F7F7',
+  },
+  inputError: {
+    borderColor: '#D93025',
+  },
+  countryCode: {
+    height: '100%',
+    paddingHorizontal: 14,
+    justifyContent: 'center',
+    backgroundColor: '#FFF6D6',
+    borderRightWidth: 1,
+    borderRightColor: 'rgba(0,0,0,0.08)',
+  },
+  countryCodeText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1C1C1C',
+  },
+  phoneInput: {
+    flex: 1,
+    fontSize: 17,
+    letterSpacing: 1,
+    color: 'black',
+    paddingHorizontal: 12,
+  },
+  editButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF1D2',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  editText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: appTheme.DARK_BOTTOMTAB,
+    marginLeft: 5,
+  },
+  errorText: {
+    fontSize: 12,
+    color: '#D93025',
+    marginTop: 6,
+  },
+  otpButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: appTheme.DARK_BOTTOMTAB,
+  },
+  otpButtonSent: {
+    backgroundColor: '#E4F6EC',
+  },
+  otpButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: 'white',
+    marginLeft: 8,
+  },
+  otpRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 8,
+  },
+  otpBox: {
+    width: 60,
+    height: 62,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: 'rgba(0,0,0,0.12)',
+    backgroundColor: '#FAFAFA',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  otpBoxFilled: {
+    borderColor: appTheme.NEW_PALLET,
+    backgroundColor: '#FFFBEF',
+  },
+  otpBoxActive: {
+    borderColor: appTheme.DARK_BOTTOMTAB,
+    backgroundColor: 'white',
+  },
+  otpDigit: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1C1C1C',
+  },
+  hiddenOtpInput: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.02,
+    color: 'transparent',
+  },
+  resendRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  resendText: {
+    fontSize: 13,
+    color: '#6B6B6B',
+  },
+  resendLink: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: appTheme.DARK_BOTTOMTAB,
     textDecorationLine: 'underline',
+    marginLeft: 8,
+  },
+  submitButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 18,
+    height: 52,
+    borderRadius: 14,
+    backgroundColor: appTheme.NEW_PALLET,
+  },
+  submitDisabled: {
+    backgroundColor: '#ECECEC',
+  },
+  submitText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: appTheme.DARK_BOTTOMTAB,
   },
 });
+
+export default OTPComponent;
+

@@ -14,6 +14,9 @@ import {
   StyleSheet,
   Linking,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import LinearGradient from 'react-native-linear-gradient';
+import ShineOverlay from '../comman/ShineOverlay';
 import React, { useCallback, useEffect, useState } from 'react';
 import colors from '../../styles/colors';
 import LottieView from 'lottie-react-native';
@@ -52,6 +55,7 @@ import { CloseIcon } from '../Svg/Svg';
 
 const includeExtra = true;
 const RedemptionFinal = (props: any) => {
+  const safeInsets = useSafeAreaInsets();
   const [conditonalAPI, setConditionalAPI] = useState({});
   const [disableNEFT, setDisableNEFT] = useState(true);
   const [disableUPI, setDisableUPI] = useState(true);
@@ -63,6 +67,7 @@ const RedemptionFinal = (props: any) => {
   const [modalVisible, setModalVisible] = useState(true);
   const [compulsaryModal, setcompulsaryModal] = useState(false);
   const [upiModal, setUpiModal] = useState(false);
+  const [upiMaintenanceModal, setUpiMaintenanceModal] = useState(false);
   const [msgTxt, setMsgTxt] = useState('');
   const [showSubmitMsg, setShowSubmitMsg] = useState(false);
   const [dbKyc, setDbKyc] = useState({});
@@ -221,242 +226,155 @@ const RedemptionFinal = (props: any) => {
 
 
 
-  return (
-    <View
-      style={{ flex: 1, backgroundColor: colors.white, height: height }}>
-      <HeaderRNE
-        backgroundColor="white"
-        backgroundImageStyle={{}}
-        barStyle="dark-content"
-        centerComponent={{
-          text: `${t('redemption')}`,
-          style: { color: 'black', fontSize: 22 },
-        }}
-        centerContainerStyle={{ height: 28, justifyContent: 'center' }}
-        leftComponent={
-          <TouchableOpacity onPress={() => props.navigation.goBack()}>
-            <Ionicons name="chevron-back" size={25} color={'black'} />
-          </TouchableOpacity>
-        }
-        leftContainerStyle={{ paddingLeft: 5 }}
-        placement="center"
-        containerStyle={{
-          bottom: Platform.OS === "android"
-            ? Platform.OS === "android" && Platform.Version <= 34
-              ?0
-              : height * 0.04
-            : 0
-        }}
-      />
-      <ScrollView>
-        <View>
-          <Card containerStyle={styles.big_card_view}>
-            <Image style={styles.image_view} source={imagePath.REEDEM_DEC} />
-          </Card>
-        </View>
-        <View
-          style={{
-            paddingTop: 20,
-            paddingHorizontal: 17,
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-          }}>
-          {/* <Button
-            onPress={() => navigation.navigate('UPIScreen', { mode: 'UPI' })}
-            containerStyle={{
-              justifyContent: 'center',
-              // elevation: 1,
-            }}
-            buttonStyle={{
-              // backgroundColor: '#FFE7C7',
-              backgroundColor: '#FEF8DD',
-              borderRadius: 20,
-              width: width / 2 - 30,
-              height: 90,
-              overflow: 'hidden',
-            }}
-            titleStyle={{
-              marginLeft: 35,
-              padding: 20,
-              fontSize: responsiveFontSize(2.2),
-              margin: 10,
-              color: 'black',
-            }}
-            title={`${t('upi')}`}
-            iconPosition={'right'}
-            disabled={true}
-            icon={
-              <View style={{ overflow: 'hidden', borderRadius: 20 }}>
-                <View
-                  style={{
-                    paddingLeft: 80,
-                    height: 120,
-                    width: 120,
-                    borderRadius: 130 / 2,
-                    backgroundColor: '#FFE7C7',
-                    // backgroundColor: '#aaaaaa',
-                    overflow: 'hidden',
-                  }}
-                />
-                <View
-                  style={{
-                    paddingTop: 120,
-                    justifyContent: 'center',
-                    alignContent: 'center',
-                    alignSelf: 'center',
-                    alignItems: 'center',
-                    position: 'absolute',
-                  }}>
-                  <Icon
-                    name="send-o"
-                    size={30}
-                    color="#585858"
-                    style={{
-                      position: 'absolute',
-                      paddingRight: 30,
-                    }}
-                  />
-                </View>
-              </View>
-            }
-          /> */}
-          <Button
-            onPress={() => { !disableUPI ? navigation.navigate('UPIScreen', { mode: 'UPI' }) : isAvalableUPI1 == false ? setUpiModal(true) : setIsAvalableUPI(true) }}
-            // onPress={() => { navigation.navigate('UPIScreen', { mode: 'UPI' }) }}
-            containerStyle={{
-              justifyContent: 'center',
-            }}
-            // disabled={disableNEFT}
-            buttonStyle={{
-              backgroundColor: '#FEF8DD',
-              borderRadius: 20,
-              width: width / 2 - 30,
-              height: 90,
-              overflow: 'hidden',
-            }}
-            titleStyle={{
-              marginLeft: 35,
-              padding: 20,
-              fontSize: responsiveFontSize(2.2),
-              margin: 10,
-              color: 'black',
-            }}
-            // title={`${t('upi')}`}
-            title={`${t('UPI')}`}
-            iconPosition={'right'}
-            icon={
-              <View style={{ overflow: 'hidden', borderRadius: 20 }}>
-                <View
-                  style={{
-                    paddingLeft: 80,
-                    height: 120,
-                    width: 120,
-                    borderRadius: 130 / 2,
-                    backgroundColor: '#FFE7C7',
-                    // backgroundColor: '#aaaaaa',
-                    overflow: 'hidden',
-                  }}
-                />
-                <View
-                  style={{
-                    paddingTop: 120,
-                    justifyContent: 'center',
-                    alignContent: 'center',
-                    alignSelf: 'center',
-                    alignItems: 'center',
-                    position: 'absolute',
-                  }}>
-                  <Icon
-                    name="send-o"
-                    size={30}
-                    color="#585858"
-                    style={{
-                      position: 'absolute',
-                      paddingRight: 30,
-                    }}
-                  />
-                </View>
-              </View>
-            }
-          />
-          <Button
-            onPress={() => { !disableNEFT ? navigation.navigate('Neft') : isAvalablePassbook1 == false ? setPassbookModal(true) : setIsAvalableUPI(true) }}
-            containerStyle={{
-              justifyContent: 'center',
-            }}
-            // disabled={disableNEFT}
-            buttonStyle={{
-              backgroundColor: '#FEF8DD',
-              borderRadius: 20,
-              width: width / 2 - 30,
-              height: 90,
-              overflow: 'hidden',
-            }}
-            titleStyle={{
-              marginLeft: 35,
-              padding: 20,
-              fontSize: responsiveFontSize(2.2),
-              margin: 10,
-              color: 'black',
-            }}
-            // title={`${t('neft')}`}
-            title={`${t('IMPS')}`}
-            iconPosition={'right'}
-            icon={
-              <View style={{ overflow: 'hidden' }}>
-                <View
-                  style={{
-                    paddingLeft: 80,
-                    height: 120,
-                    width: 120,
-                    borderRadius: 130 / 2,
-                    backgroundColor: '#FFE7C7',
-                    overflow: 'hidden',
-                  }}
-                />
-                <View
-                  style={{
-                    paddingTop: 120,
-                    justifyContent: 'center',
-                    alignContent: 'center',
-                    alignSelf: 'center',
-                    alignItems: 'center',
-                    position: 'absolute',
-                  }}>
-                  <Icon
-                    name="bank"
-                    size={30}
-                    color="#585858"
-                    style={{
-                      position: 'absolute',
-                      paddingRight: 30,
-                    }}
-                  />
-                </View>
-              </View>
-            }
-          />
-        </View>
-        <View
-          style={{
-            paddingLeft: 20,
-            paddingRight: 10,
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            width: '100%',
-          }}>
-          <View style={{ width: '50%', }}>
-            {disableUPI ?
-              <Text style={{ color: 'red' }}>{t('verify UPI ID')}</Text>
-              : null}
-          </View>
+  const openImps = () => {
+    !disableNEFT
+      ? navigation.navigate('Neft')
+      : isAvalablePassbook1 == false
+        ? setPassbookModal(true)
+        : setIsAvalableUPI(true);
+  };
 
-          {disableNEFT ? (
-            <View style={{ width: 160 }}>
-              <Text style={{ color: 'red' }}>{t('verifyKYC')}</Text>
+  return (
+    // White behind the status bar so it blends with the header; the page itself is grey.
+    <View style={{ flex: 1, backgroundColor: 'white' }}>
+      <View style={rfStyles.header}>
+        <Pressable
+          onPress={() => props.navigation.goBack()}
+          hitSlop={6}
+          style={({ pressed }) => [rfStyles.headerButton, pressed && { opacity: 0.6 }]}>
+          <Ionicons name="chevron-back" size={22} color={appTheme.DARK_BOTTOMTAB} />
+        </Pressable>
+        <Text style={rfStyles.headerTitle}>{`${t('redemption')}`}</Text>
+        <View style={{ width: 40 }} />
+      </View>
+      <ScrollView
+        style={{ backgroundColor: '#F7F7F7' }}
+        // Keep the last button clear of the Android nav bar / iPhone home indicator.
+        contentContainerStyle={{ paddingBottom: 40 + safeInsets.bottom }}
+        showsVerticalScrollIndicator={false}>
+        {/* Hero */}
+        <LinearGradient
+          colors={['#FFF6DE', '#FDEBC0']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={rfStyles.hero}>
+          <ShineOverlay />
+          <Image style={rfStyles.heroImage} source={imagePath.REEDEM_DEC} />
+          <View style={rfStyles.balanceChip}>
+            <Ionicons name="star" size={16} color={appTheme.NEW_PALLET} />
+            <Text style={rfStyles.balanceLabel}>Available</Text>
+            <Text style={rfStyles.balanceValue}>{balancePoint}</Text>
+            <Text style={rfStyles.balanceUnit}>pts</Text>
+          </View>
+        </LinearGradient>
+
+        <Text style={rfStyles.sectionTitle}>Choose payout method</Text>
+
+        {/* UPI (under maintenance) */}
+        <Pressable
+          onPress={() => setUpiMaintenanceModal(true)}
+          style={({ pressed }) => [rfStyles.option, rfStyles.optionMuted, pressed && { opacity: 0.85 }]}>
+          <View style={[rfStyles.optionIcon, { backgroundColor: '#EFEFEF' }]}>
+            <Icon name="send-o" size={22} color="#8A8A8A" />
+          </View>
+          <View style={{ flex: 1, marginLeft: 14 }}>
+            <View style={rfStyles.optionTitleRow}>
+              <Text style={[rfStyles.optionTitle, { color: '#6B6B6B' }]}>{`${t('UPI')}`}</Text>
+              <View style={[rfStyles.badge, { backgroundColor: '#FFF1D2' }]}>
+                <Ionicons name="construct-outline" size={11} color="#B7791F" />
+                <Text style={[rfStyles.badgeText, { color: '#B7791F' }]}>Under maintenance</Text>
+              </View>
             </View>
-          ) : null}
-        </View>
+            <Text style={rfStyles.optionSubtitle}>Instant transfer to your UPI ID</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color="#C9C9C9" />
+        </Pressable>
+
+        {/* IMPS */}
+        <Pressable
+          onPress={openImps}
+          style={({ pressed }) => [rfStyles.option, pressed && { transform: [{ scale: 0.99 }], opacity: 0.9 }]}>
+          <View style={[rfStyles.optionIcon, { backgroundColor: appTheme.NEW_PALLET }]}>
+            <Icon name="bank" size={22} color={appTheme.DARK_BOTTOMTAB} />
+          </View>
+          <View style={{ flex: 1, marginLeft: 14 }}>
+            <View style={rfStyles.optionTitleRow}>
+              <Text style={rfStyles.optionTitle}>{`${t('IMPS')}`}</Text>
+              {disableNEFT ? (
+                <View style={[rfStyles.badge, { backgroundColor: '#FDECEA' }]}>
+                  <Ionicons name="alert-circle-outline" size={11} color="#D93025" />
+                  <Text style={[rfStyles.badgeText, { color: '#D93025' }]}>KYC required</Text>
+                </View>
+              ) : (
+                <View style={[rfStyles.badge, { backgroundColor: '#E4F6EC' }]}>
+                  <Ionicons name="checkmark-circle" size={11} color="#1E9E5A" />
+                  <Text style={[rfStyles.badgeText, { color: '#1E9E5A' }]}>Available</Text>
+                </View>
+              )}
+            </View>
+            <Text style={rfStyles.optionSubtitle}>Direct transfer to your bank account</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={appTheme.DARK_BOTTOMTAB} />
+        </Pressable>
+
+        {disableNEFT ? (
+          <View style={rfStyles.note}>
+            <Ionicons name="information-circle" size={18} color="#D93025" />
+            <Text style={rfStyles.noteText}>{t('verifyKYC')}</Text>
+          </View>
+        ) : null}
+
+        {thresholdPoint ? (
+          <View style={[rfStyles.note, rfStyles.noteInfo]}>
+            <Ionicons name="information-circle" size={18} color="#2F6FED" />
+            <Text style={[rfStyles.noteText, { color: '#3A4A6B' }]}>
+              Minimum {thresholdPoint} points are required for your first redemption.
+            </Text>
+          </View>
+        ) : null}
+
+        <Pressable onPress={handleCallSupport} style={rfStyles.support}>
+          <Ionicons name="call-outline" size={16} color={appTheme.DARK_BOTTOMTAB} />
+          <Text style={rfStyles.supportText}>Need help? Call support</Text>
+        </Pressable>
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={upiMaintenanceModal}
+          onRequestClose={() => setUpiMaintenanceModal(false)}>
+          <View style={styles.centeredView}>
+            <View style={styles.modalView}>
+              <TouchableOpacity onPress={() => { setUpiMaintenanceModal(false) }}
+                style={{
+                  backgroundColor: appTheme.NEW_PALLET,
+                  borderRadius: 20,
+                  padding: 2,
+                  position: 'absolute', right: 0, top: 0
+                }}>
+                <CloseIcon />
+              </TouchableOpacity>
+              <LottieView
+                style={{ height: 200, width: 200 }}
+                source={require('../../../assets/images/alert.json')}
+                autoPlay
+                loop
+              />
+              <Text style={styles.modalText}>UPI Under Maintenance</Text>
+              <Text style={styles.modalText}>
+                UPI redemption is temporarily unavailable. Please use IMPS or try again later.
+              </Text>
+              <Button
+                title={'OK'}
+                onPress={() => { setUpiMaintenanceModal(false) }}
+                buttonStyle={{
+                  backgroundColor: appTheme.NEW_PALLET,
+                  borderRadius: 12,
+                  width: 80,
+                }}
+              />
+            </View>
+          </View>
+        </Modal>
         {/* // Uncomment before the production */}
         {redemptionPoint === 0 &&
           Number(balancePoint) < Number(thresholdPoint) &&
@@ -759,5 +677,174 @@ const RedemptionFinal = (props: any) => {
     </View>
   );
 };
+
+const rfStyles = StyleSheet.create({
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'white',
+    paddingHorizontal: 16,
+    paddingTop: 6,
+    paddingBottom: 12,
+    borderBottomLeftRadius: 22,
+    borderBottomRightRadius: 22,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 4,
+    zIndex: 2,
+  },
+  headerButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#F4F4F4',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1C1C1C',
+  },
+  hero: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 22,
+    paddingTop: 16,
+    paddingBottom: 14,
+    alignItems: 'center',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#F5E2B0',
+  },
+  heroImage: {
+    width: '85%',
+    height: 170,
+    resizeMode: 'contain',
+  },
+  balanceChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 10,
+    backgroundColor: appTheme.DARK_BOTTOMTAB,
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  balanceLabel: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.7)',
+    marginLeft: 6,
+  },
+  balanceValue: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: 'white',
+    marginLeft: 6,
+  },
+  balanceUnit: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.7)',
+    marginLeft: 4,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1C1C1C',
+    marginHorizontal: 16,
+    marginTop: 22,
+    marginBottom: 4,
+  },
+  option: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 16,
+    marginTop: 10,
+    backgroundColor: 'white',
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#F5E2B0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  optionMuted: {
+    backgroundColor: '#FAFAFA',
+    borderColor: '#EDEDED',
+  },
+  optionIcon: {
+    width: 50,
+    height: 50,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  optionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+  },
+  optionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1C1C1C',
+    marginRight: 8,
+  },
+  optionSubtitle: {
+    fontSize: 12,
+    color: '#8A8A8A',
+    marginTop: 4,
+  },
+  badge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  badgeText: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    marginLeft: 3,
+  },
+  note: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 16,
+    marginTop: 12,
+    backgroundColor: '#FDECEA',
+    borderRadius: 12,
+    padding: 12,
+  },
+  noteInfo: {
+    backgroundColor: '#E8F0FF',
+  },
+  noteText: {
+    flex: 1,
+    fontSize: 12.5,
+    color: '#D93025',
+    marginLeft: 8,
+  },
+  support: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 22,
+    paddingVertical: 10,
+  },
+  supportText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: appTheme.DARK_BOTTOMTAB,
+    marginLeft: 6,
+    textDecorationLine: 'underline',
+  },
+});
 
 export default RedemptionFinal;

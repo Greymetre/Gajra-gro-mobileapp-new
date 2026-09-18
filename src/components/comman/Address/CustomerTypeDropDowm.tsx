@@ -1,6 +1,7 @@
 import React, {useState, useEffect} from 'react';
 import {requestGetCustomerTypeList} from '../../../services/backend_helper';
 import {Dropdown} from 'react-native-element-dropdown';
+import {pickerListProps} from './dropdownTheme';
 import {Dimensions} from 'react-native';
 import {useTranslation} from 'react-i18next';
 
@@ -45,22 +46,14 @@ const CustomerTypeDropDowm = (props: any) => {
         borderColor: 'rgba(0,0,0,0.08)',
         borderWidth: 1,
         borderRadius: 8,
-        paddingHorizontal: 12
+        paddingHorizontal: 12,
+        // Optional override, e.g. to fit inside a card.
+        ...(props.dropdownStyle || {}),
       }}
-      containerStyle={{borderRadius: 8}}
-      dropdownPosition={'top'}
-      selectedTextStyle={{color: 'black',fontWeight:'bold',}}
       selectedTextProps={{selectionColor: 'black',}}
-      itemTextStyle={{paddingLeft: 10}}
-      inputSearchStyle={{
-        height: 40,
-      }}
-      maxHeight={300}
+      {...pickerListProps({selectedValue: statename, icon: 'pricetag-outline'})}
       labelField="label"
       valueField="value"
-      placeholderStyle={{
-        fontWeight:'bold',
-      }}
       placeholder={`${t('select')} ${t('customertype')}`}
       searchPlaceholder="Search..."
       value={statename}

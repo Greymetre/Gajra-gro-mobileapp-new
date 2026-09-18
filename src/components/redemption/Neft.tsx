@@ -10,7 +10,9 @@ import {
   Linking,
   Platform,
   Dimensions,
+  Pressable,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import React, { useEffect, useState } from 'react';
 import {
   responsiveHeight,
@@ -36,8 +38,12 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useTranslation } from 'react-i18next';
 import ModalLoader from '../loader/ModalLoader';
 import { Modal } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
+import MCI from 'react-native-vector-icons/MaterialCommunityIcons';
+import ShineOverlay from '../comman/ShineOverlay';
 
 const Neft = (props: any) => {
+  const safeInsets = useSafeAreaInsets();
   const { height, width } = Dimensions.get('window');
   const { t } = useTranslation();
 
@@ -262,351 +268,451 @@ const Neft = (props: any) => {
     Linking.openURL("tel:8103324701");
   };
 
-  const VerificationBadge = ({ loading, acVerified }: any) => {
-    if (loading) {
-      return (
-        <View
-          style={{
-            ...styles.badgeContainer,
-            backgroundColor: 'gray',
-            justifyContent: 'center',
-            width: '16%',
-            paddingVertical: 10
-            // height: '9%',
-          }}>
-          <ActivityIndicator size="small" color="#000000" />
-        </View>
-      );
-    }
-    return (
-      <View
-        style={{
-          ...styles.badgeContainer,
-          backgroundColor: acVerified ? '#b7df89' : '#f94c56',
-          justifyContent: 'flex-end',
-        }}>
-        <Text style={styles.badgeText}>
-          {t(acVerified ? 'verified' : 'notverified')}
-        </Text>
-      </View>
-    );
+  const [declared, setDeclared] = useState(false);
+
+  const spacedAccount = (formik?.values?.accountNo || '').replace(/(.{4})(?=.)/g, '$1 ');
+
+  const goNext = () => {
+    navigation.navigate(navigationStrings.Payout, {
+      mode: 'IMPS',
+      upiid: '',
+      bank: formik.values.bankName,
+      accountnum: formik.values.accountNo,
+      ifsccode: formik.values.ifsc,
+      holdername: formik.values.holderName,
+    });
   };
+
+  const renderDetail = (icon: string, label: string, value?: string) => (
+    <View style={nStyles.detailRow}>
+      <View style={nStyles.detailIcon}>
+        <Ionicons name={icon} size={16} color={appTheme.DARK_BOTTOMTAB} />
+      </View>
+      <Text style={nStyles.detailLabel}>{label}</Text>
+      <Text style={nStyles.detailValue} numberOfLines={1} selectable>
+        {value || '-'}
+      </Text>
+    </View>
+  );
+
   return (
-    <View style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
-      <SafeAreaView>
-        <KeyboardAwareScrollView>
-          <Header
-            backgroundColor="white"
-            backgroundImageStyle={{}}
-            barStyle="dark-content"
-            centerComponent={{
-              text: `${t('IMPS')} ${t('redemption')}`,
-              style: { color: 'black', fontSize: 19 },
-            }}
-            centerContainerStyle={{ height: 28, justifyContent: 'center' }}
-            leftContainerStyle={{ paddingLeft: 5 }}
-            leftComponent={
-              <TouchableOpacity onPress={() => navigation.goBack()}>
-                <Ionicons name="chevron-back" size={25} color={'black'} />
-              </TouchableOpacity>
-            }
-            placement="center"
-            containerStyle={{
-              bottom: Platform.OS === "android"
-                ? Platform.OS === "android" && Platform.Version <= 34
-                  ?0
-                  : height * 0.04
-                : 0
-            }}
-          />
+    // White behind the status bar so it blends with the header; the page itself is grey.
+    <View style={{ flex: 1, backgroundColor: 'white' }}>
+      <View style={nStyles.header}>
+        <Pressable
+          onPress={() => navigation.goBack()}
+          hitSlop={6}
+          style={({ pressed }) => [nStyles.headerButton, pressed && { opacity: 0.6 }]}>
+          <Ionicons name="chevron-back" size={22} color={appTheme.DARK_BOTTOMTAB} />
+        </Pressable>
+        <Text style={nStyles.headerTitle}>{`${t('IMPS')} ${t('redemption')}`}</Text>
+        <View style={{ width: 40 }} />
+      </View>
 
-          {acVerified ?
-            <ScrollView
-              style={{ marginTop: responsiveHeight(1) }}
-              showsVerticalScrollIndicator={false}>
-              <View>
-                <View
-                  style={{
-                    justifyContent: 'flex-end',
-                    alignItems: 'flex-end',
-                    alignContent: 'flex-end',
-                  }}>
-
-                  <VerificationBadge loading={loading} acVerified={acVerified} />
-                  <View style={{ width: '93%', alignSelf: 'center' }}>
-                    <Input
-                      labelStyle={{
-                        fontWeight: '100',
-                        fontSize: 15,
-                        color: 'black',
-                        paddingBottom: 10,
-                      }}
-                      containerStyle={{
-                        justifyContent: 'center',
-                        paddingTop: 20,
-                        paddingBottom: 0,
-                        borderColor: 'rgba(0,0,0,0.08)',
-                      }}
-                      inputContainerStyle={{
-                        borderColor: 'rgba(0,0,0,0.08)',
-                        borderWidth: 1,
-                        borderRadius: 10,
-                      }}
-                      renderErrorMessage={false}
-                      label={`${t('bank')}`}
-                      onChangeText={(text: string) => {
-                        formik.setFieldValue('bankName', text);
-                      }}
-                      value={formik?.values?.bankName}
-                      disabled={!disableinput}
-                    />
-                    {formik.errors.bankName && (
-                      <Text style={{ fontSize: 11, color: 'red', marginHorizontal: 12 }}>
-                        {formik.errors.bankName}
-                      </Text>
-                    )}
-                  </View>
-                  <View style={{ width: '93%', alignSelf: 'center' }}>
-                    <Input
-                      labelStyle={{
-                        fontWeight: '100',
-                        fontSize: 15,
-                        color: 'black',
-                        paddingBottom: 10,
-                      }}
-                      containerStyle={{
-                        justifyContent: 'center',
-                        paddingTop: 20,
-                        paddingBottom: 0,
-                        borderColor: 'rgba(0,0,0,0.08)',
-                      }}
-                      inputContainerStyle={{
-                        borderColor: 'rgba(0,0,0,0.08)',
-                        borderWidth: 1,
-                        borderRadius: 10,
-                      }}
-                      renderErrorMessage={false}
-                      label={`${t('accno')}`}
-                      // placeHolder="Account Number"
-                      // placeHolderTextColor={colors.grey}
-                      onChangeText={(text: string) => {
-                        formik.setFieldValue('accountNo', text);
-                      }}
-                      value={formik?.values?.accountNo}
-                      keyboardType="numeric"
-                      rightIcon={undefined}
-                      disabled={!disableinput}
-                    />
-                    {formik.errors.accountNo && (
-                      <Text style={{ fontSize: 11, color: 'red', marginHorizontal: 12 }}>
-                        {formik.errors.accountNo}
-                      </Text>
-                    )}
-                  </View>
-
-                  <View style={{ width: '93%', alignSelf: 'center' }}>
-                    <Input
-                      // onChange={setAcVerified(false)}
-                      labelStyle={{
-                        fontWeight: '100',
-                        fontSize: 15,
-                        color: 'black',
-                        paddingBottom: 10,
-                      }}
-                      containerStyle={{
-                        justifyContent: 'center',
-                        paddingTop: 20,
-                        paddingBottom: 0,
-                        borderColor: 'rgba(0,0,0,0.08)',
-                      }}
-                      inputContainerStyle={{
-                        borderColor: 'rgba(0,0,0,0.08)',
-                        borderWidth: 1,
-                        borderRadius: 10,
-                      }}
-                      inputStyle={{
-                        textTransform: 'uppercase',
-                      }}
-                      renderErrorMessage={false}
-                      label={`${t('ifsccode')}`}
-                      onChangeText={(text: string) => {
-                        formik.setFieldValue('ifsc', text);
-                      }}
-                      value={formik?.values?.ifsc}
-                      disabled={!disableinput}
-                    // maxLength={11}
-                    />
-                    {console.log(formik?.values?.ifsc)}
-                    {formik.errors.ifsc && (
-                      <Text style={{ fontSize: 11, color: 'red', marginHorizontal: 12 }}>
-                        {formik.errors.ifsc}
-                      </Text>
-                    )}
-                  </View>
-                  <View style={{ width: '93%', alignSelf: 'center' }}>
-                    <Input
-                      labelStyle={{
-                        fontWeight: '100',
-                        fontSize: 15,
-                        color: 'black',
-                        paddingBottom: 10,
-                      }}
-                      containerStyle={{
-                        justifyContent: 'center',
-                        paddingTop: 20,
-                        paddingBottom: 0,
-                        borderColor: 'rgba(0,0,0,0.08)',
-                      }}
-                      inputContainerStyle={{
-                        borderColor: 'rgba(0,0,0,0.08)',
-                        borderWidth: 1,
-                        borderRadius: 10,
-                      }}
-                      renderErrorMessage={false}
-                      label={`${t('acholdername')}`}
-                      // placeHolder="Recipient Name"
-                      // placeHolderTextColor={colors.grey}
-                      onChangeText={(text: string) => {
-                        formik.setFieldValue('holderName', text);
-                      }}
-                      value={formik?.values?.holderName}
-                      disabled={!disableinput}
-                    />
-                    {/* {formik.errors.holderName && ( */}
-                    {formik.touched.holderName && formik.errors.holderName && (
-                      <Text style={{ fontSize: 11, color: 'red', marginHorizontal: 12 }}>
-                        {formik.errors.holderName}
-                      </Text>
-                    )}
-                  </View>
-
-                  <View
-                    style={{
-                      width: '90%',
-                      paddingTop: 10,
-                      marginHorizontal: responsiveWidth(4),
-                    }}>
-                    {acVerified ? (
-                      <Button
-                        title={`${t('next')}`}
-                        onPress={() => {
-                          navigation.navigate(navigationStrings.Payout, {
-                            mode: 'IMPS',
-                            upiid: '',
-                            bank: formik.values.bankName,
-                            accountnum: formik.values.accountNo,
-                            ifsccode: formik.values.ifsc,
-                            holdername: formik.values.holderName,
-                          });
-                        }}
-                        buttonStyle={{
-                          backgroundColor: appTheme.NEW_PALLET,
-                          borderRadius: 8,
-                        }}
-                        titleStyle={{ color: 'black' }}
-                        containerStyle={{ paddingTop: 10 }}
-                      />
-                    ) : (
-                      <Button
-                        title={
-                          showSendApproval
-                            ? `${t('sendapproval')}`
-                            : `${t('sendapproval')}`
-                        }
-                        onPress={() => {
-                          console.log('Form is Valid: ', formik.isValid);
-                          if (formik.isValid) {
-                            formik.handleSubmit();
-                          }
-                        }}
-                        buttonStyle={{
-                          backgroundColor: appTheme.NEW_PALLET,
-                          borderRadius: 8,
-                        }}
-                        titleStyle={{ color: 'black' }}
-                        containerStyle={{ paddingTop: 10 }}
-                        disabled={disableSubmitBtn}
-                      />
-                    )}
-                    {disableSubmitBtn && !acVerified ? (
-                      <Text style={{ color: 'red' }}>{`${t('yourneftsend')}`}</Text>
-                    ) : null}
-
-                    {/* <Button
-                  title="Confirm"
-                  onPress={() => {
-                    if (formik.isValid) {
-                      onSubmit(formik.values);
-                      navigation.navigate(navigationStrings.REWARDSUCCESS, {
-                        pts,
-                      });
-                      console.log('Form is Valid: ', formik.isValid);
-                      // console.log('form is valf')
-                      // props.navigation.navigate();
-                    } else {
-                      console.log('Form is Valid: ', formik.isValid);
-                    }
-                    // disabled={!(formik.isValid && formik.dirty)}
-                  }}
-                /> */}
-
-                    <View
-                      style={{
-                        paddingTop: 10,
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        alignContent: 'center',
-                        justifyContent: 'center',
-                        alignSelf: 'center',
-                      }}>
-                      <Icon
-                        name="lock"
-                        size={15}
-                        color="black"
-                        style={{ paddingHorizontal: 5 }}
-                      />
-                      {/* <Image
-                    source={imagePath.SECURELOCK}
-                    style={{height: 12, width: 12}}
-                  /> */}
-                      <Text style={{ color: 'black' }}>{`${t('secureinfo')}`}</Text>
-                    </View>
-                  </View>
+      <ScrollView
+        style={{ backgroundColor: '#F7F7F7' }}
+        // Keep the last button clear of the Android nav bar / iPhone home indicator.
+        contentContainerStyle={{ paddingBottom: 40 + safeInsets.bottom }}
+        showsVerticalScrollIndicator={false}>
+        {loading ? (
+          <View style={nStyles.loadingBox}>
+            <ActivityIndicator size="large" color={appTheme.DARK_BOTTOMTAB} />
+            <Text style={nStyles.loadingText}>Loading your bank details…</Text>
+          </View>
+        ) : acVerified ? (
+          <>
+            {/* Bank card */}
+            <LinearGradient
+              colors={['#2B2829', appTheme.DARK_BOTTOMTAB, '#4A4344']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={nStyles.bankCard}>
+              <View style={nStyles.bankDecor} />
+              <ShineOverlay />
+              <View style={nStyles.bankTop}>
+                <View style={nStyles.bankIcon}>
+                  <MCI name="bank" size={20} color={appTheme.DARK_BOTTOMTAB} />
+                </View>
+                <Text style={nStyles.bankName} numberOfLines={1}>
+                  {formik?.values?.bankName || `${t('bank')}`}
+                </Text>
+                <View style={nStyles.verifiedBadge}>
+                  <Ionicons name="shield-checkmark" size={12} color="#1E9E5A" />
+                  <Text style={nStyles.verifiedText}>{t('verified')}</Text>
                 </View>
               </View>
-            </ScrollView>
-            :
-            <View style={styles.modalContainer}>
-              <View style={styles.modalView}>
-                <Text style={styles.modalTitle}>Verification Pending</Text>
-                <Text style={styles.modalText}>
-                  Your account verification is still in process. If you need assistance,
-                  please contact our support team at:
-                </Text>
-                <Text style={styles.helplineNumber}>📞 81033 24701</Text>
-                <TouchableOpacity style={styles.contactButton} onPress={handleCallSupport}>
-                  <Text style={styles.buttonText}>Call Support</Text>
-                </TouchableOpacity>
+              <Text style={nStyles.accountNumber}>{spacedAccount}</Text>
+              <View style={nStyles.bankBottom}>
+                <View style={{ flex: 1 }}>
+                  <Text style={nStyles.bankMetaLabel}>{`${t('acholdername')}`}</Text>
+                  <Text style={nStyles.bankMetaValue} numberOfLines={1}>
+                    {formik?.values?.holderName}
+                  </Text>
+                </View>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Text style={nStyles.bankMetaLabel}>{`${t('ifsccode')}`}</Text>
+                  <Text style={nStyles.bankMetaValue}>
+                    {(formik?.values?.ifsc || '').toUpperCase()}
+                  </Text>
+                </View>
               </View>
+            </LinearGradient>
+
+            {/* Details */}
+            <View style={nStyles.card}>
+              <Text style={nStyles.cardTitle}>Payout account</Text>
+              {renderDetail('business-outline', `${t('bank')}`, formik?.values?.bankName)}
+              {renderDetail('keypad-outline', `${t('accno')}`, formik?.values?.accountNo)}
+              {renderDetail('barcode-outline', `${t('ifsccode')}`, (formik?.values?.ifsc || '').toUpperCase())}
+              {renderDetail('person-outline', `${t('acholdername')}`, formik?.values?.holderName)}
+              <Text style={nStyles.cardHint}>
+                To change these details, update them from your Profile. Changes need re-verification.
+              </Text>
             </View>
 
-          }
+            {/* Self declaration */}
+            <Pressable
+              onPress={() => setDeclared(!declared)}
+              style={[nStyles.declaration, declared && nStyles.declarationChecked]}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: declared }}>
+              <View style={[nStyles.checkbox, declared && nStyles.checkboxChecked]}>
+                {declared ? <Ionicons name="checkmark" size={16} color={appTheme.DARK_BOTTOMTAB} /> : null}
+              </View>
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text style={nStyles.declarationTitle}>Self Declaration</Text>
+                <Text style={nStyles.declarationText}>
+                  I hereby declare that the bank account shown above belongs to me and the details are
+                  correct. I understand that my redemption amount will be transferred to this account,
+                  and Gajra Gears is not responsible for any transfer made to incorrect details provided
+                  by me.
+                </Text>
+              </View>
+            </Pressable>
 
-        </KeyboardAwareScrollView>
+            <Pressable
+              disabled={!declared}
+              onPress={goNext}
+              style={({ pressed }) => [
+                nStyles.nextButton,
+                !declared && nStyles.nextDisabled,
+                pressed && { transform: [{ scale: 0.98 }] },
+              ]}>
+              <Text style={[nStyles.nextText, !declared && { color: '#9A9A9A' }]}>{`${t('next')}`}</Text>
+              <Ionicons
+                name="arrow-forward"
+                size={18}
+                color={declared ? appTheme.DARK_BOTTOMTAB : '#9A9A9A'}
+                style={{ marginLeft: 6 }}
+              />
+            </Pressable>
+            {!declared ? (
+              <Text style={nStyles.nextHint}>Please accept the self declaration to continue</Text>
+            ) : null}
 
-
-
-      </SafeAreaView>
-      {/* ) : (
-    <Location
-    onBackPress{()=>{setLocationVisibility(false);}}/>
-    )}
-  ); */}
+            <View style={nStyles.secureRow}>
+              <Icon name="lock" size={13} color="#6B6B6B" />
+              <Text style={nStyles.secureText}>{`${t('secureinfo')}`}</Text>
+            </View>
+          </>
+        ) : (
+          <View style={nStyles.pendingCard}>
+            <View style={nStyles.pendingIcon}>
+              <Ionicons name="hourglass-outline" size={30} color="#B7791F" />
+            </View>
+            <Text style={nStyles.pendingTitle}>Verification Pending</Text>
+            <Text style={nStyles.pendingText}>
+              Your bank account verification is still in process. If you need assistance, please
+              contact our support team.
+            </Text>
+            <Text style={nStyles.helpline}>📞 81033 24701</Text>
+            <Pressable
+              style={({ pressed }) => [nStyles.nextButton, { alignSelf: 'stretch', marginHorizontal: 0 }, pressed && { opacity: 0.85 }]}
+              onPress={handleCallSupport}>
+              <Ionicons name="call" size={18} color={appTheme.DARK_BOTTOMTAB} />
+              <Text style={[nStyles.nextText, { marginLeft: 8 }]}>Call Support</Text>
+            </Pressable>
+          </View>
+        )}
+      </ScrollView>
     </View>
   );
 };
 
-
+const nStyles = StyleSheet.create({
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'white',
+    paddingHorizontal: 16,
+    paddingTop: 6,
+    paddingBottom: 12,
+    borderBottomLeftRadius: 22,
+    borderBottomRightRadius: 22,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 4,
+    zIndex: 2,
+  },
+  headerButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#F4F4F4',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1C1C1C',
+  },
+  loadingBox: {
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  loadingText: {
+    fontSize: 13,
+    color: '#8A8A8A',
+    marginTop: 12,
+  },
+  bankCard: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 22,
+    padding: 20,
+    overflow: 'hidden',
+  },
+  bankDecor: {
+    position: 'absolute',
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    right: -70,
+    bottom: -100,
+    backgroundColor: 'rgba(247,209,133,0.12)',
+  },
+  bankTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  bankIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: appTheme.NEW_PALLET,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bankName: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '700',
+    color: 'white',
+    marginLeft: 10,
+  },
+  verifiedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E4F6EC',
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  verifiedText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#1E9E5A',
+    marginLeft: 3,
+  },
+  accountNumber: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: 'white',
+    letterSpacing: 2,
+    marginTop: 26,
+  },
+  bankBottom: {
+    flexDirection: 'row',
+    marginTop: 18,
+  },
+  bankMetaLabel: {
+    fontSize: 10.5,
+    color: 'rgba(255,255,255,0.6)',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  bankMetaValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: appTheme.NEW_PALLET,
+    marginTop: 3,
+  },
+  card: {
+    marginHorizontal: 16,
+    marginTop: 14,
+    backgroundColor: 'white',
+    borderRadius: 18,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  cardTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1C1C1C',
+    marginBottom: 4,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#EDEDED',
+  },
+  detailIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 9,
+    backgroundColor: '#FFF1D2',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  detailLabel: {
+    fontSize: 13,
+    color: '#8A8A8A',
+    marginLeft: 10,
+  },
+  detailValue: {
+    flex: 1,
+    textAlign: 'right',
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1C1C1C',
+    marginLeft: 12,
+  },
+  cardHint: {
+    fontSize: 11.5,
+    color: '#9A9A9A',
+    marginTop: 10,
+  },
+  declaration: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginHorizontal: 16,
+    marginTop: 14,
+    backgroundColor: 'white',
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1.5,
+    borderColor: '#EDEDED',
+  },
+  declarationChecked: {
+    borderColor: appTheme.NEW_PALLET,
+    backgroundColor: '#FFFBF1',
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 7,
+    borderWidth: 2,
+    borderColor: '#BDBDBD',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
+  },
+  checkboxChecked: {
+    backgroundColor: appTheme.NEW_PALLET,
+    borderColor: appTheme.NEW_PALLET,
+  },
+  declarationTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1C1C1C',
+  },
+  declarationText: {
+    fontSize: 12,
+    color: '#6B6B6B',
+    lineHeight: 18,
+    marginTop: 4,
+  },
+  nextButton: {
+    flexDirection: 'row',
+    marginHorizontal: 16,
+    marginTop: 18,
+    height: 52,
+    borderRadius: 14,
+    backgroundColor: appTheme.NEW_PALLET,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  nextDisabled: {
+    backgroundColor: '#ECECEC',
+  },
+  nextText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: appTheme.DARK_BOTTOMTAB,
+  },
+  nextHint: {
+    fontSize: 11.5,
+    color: '#B7791F',
+    textAlign: 'center',
+    marginTop: 8,
+  },
+  secureRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 14,
+  },
+  secureText: {
+    fontSize: 12,
+    color: '#6B6B6B',
+    marginLeft: 6,
+  },
+  pendingCard: {
+    marginHorizontal: 16,
+    marginTop: 24,
+    backgroundColor: 'white',
+    borderRadius: 22,
+    padding: 22,
+    alignItems: 'center',
+  },
+  pendingIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#FFF1D2',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pendingTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1C1C1C',
+    marginTop: 14,
+  },
+  pendingText: {
+    fontSize: 13,
+    color: '#6B6B6B',
+    textAlign: 'center',
+    lineHeight: 19,
+    marginTop: 8,
+  },
+  helpline: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#B7791F',
+    marginTop: 12,
+  },
+});
 
 const styles = StyleSheet.create({
   badgeContainer: {
