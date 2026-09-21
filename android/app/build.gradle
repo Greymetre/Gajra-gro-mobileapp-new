@@ -81,8 +81,8 @@ android {
         applicationId "com.tfl.gajragear"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 56
-        versionName "6.5"
+        versionCode 57
+        versionName "6.6"
                 buildConfigField "boolean", "IS_NEW_ARCHITECTURE_ENABLED", isNewArchitectureEnabled().toString()
 //        missingDimensionStrategy 'react-native-vision-camera', 'general'
         // missingDimensionStrategy 'react-native-camera', 'general'

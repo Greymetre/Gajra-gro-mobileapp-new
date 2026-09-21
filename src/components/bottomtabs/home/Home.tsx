@@ -10,6 +10,7 @@ import {
   BackHandler,
   Platform,
   StyleSheet,
+  Alert,
 } from 'react-native';
 import React, { useCallback, useEffect, useState } from 'react';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
@@ -575,9 +576,11 @@ const Home = (props: any) => {
           ))}
         </View>
 
-        {/* e-Catalogue */}
+        {/* e-Catalogue (coming soon — webview paused for now) */}
         <Pressable
-          onPress={() => props?.navigation.navigate('CatalogueWebView')}
+          onPress={() =>
+            Alert.alert('Coming Soon', 'e-Catalogue will be available soon. Stay tuned!')
+          }
           style={({ pressed }) => [homeStyles.catalogueWrap, pressed && homeStyles.pressed]}>
           <LinearGradient
             colors={['#2B2829', appTheme.DARK_BOTTOMTAB, '#4A4344']}
@@ -589,11 +592,17 @@ const Home = (props: any) => {
               <Ionicons name="albums-outline" size={24} color={appTheme.DARK_BOTTOMTAB} />
             </View>
             <View style={{ flex: 1, marginLeft: 14 }}>
-              <Text style={homeStyles.catalogueTitle}>e-Catalogue</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={homeStyles.catalogueTitle}>e-Catalogue</Text>
+                <View style={homeStyles.soonPill}>
+                  <Ionicons name="time-outline" size={10} color="#B7791F" />
+                  <Text style={homeStyles.soonPillText}>Coming Soon</Text>
+                </View>
+              </View>
               <Text style={homeStyles.catalogueSubtitle}>Browse our complete product range</Text>
             </View>
             <View style={homeStyles.catalogueCta}>
-              <Ionicons name="chevron-forward" size={18} color={appTheme.DARK_BOTTOMTAB} />
+              <Ionicons name="lock-closed" size={16} color={appTheme.DARK_BOTTOMTAB} />
             </View>
           </LinearGradient>
         </Pressable>
@@ -955,6 +964,21 @@ const homeStyles = StyleSheet.create({
     fontSize: 11.5,
     color: 'rgba(255,255,255,0.65)',
     marginTop: 3,
+  },
+  soonPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF1D2',
+    borderRadius: 10,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    marginLeft: 8,
+  },
+  soonPillText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#B7791F',
+    marginLeft: 3,
   },
   catalogueCta: {
     width: 32,
