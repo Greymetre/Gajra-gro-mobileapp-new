@@ -610,7 +610,8 @@ const Home = (props: any) => {
         {/* Room for the floating tab bar */}
         <View style={{ height: TAB_BAR_SPACE }} />
 
-        {displayWelcomePoints === true ? (
+        {/* Welcome points are only given to mechanics, so retailers never see this popup */}
+        {displayWelcomePoints === true && profileData?.customerType === 'Mechanic' ? (
           <View style={styles.centeredView}>
             <Modal animationType="slide" transparent={true} visible={modalVisibleWP}>
               <View style={styles.centeredView}>
