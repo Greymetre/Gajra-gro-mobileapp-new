@@ -31,6 +31,19 @@ export interface ViewAuthInfoInterface {
     customerType?: string;
     avatar? : string ;
     address? : string
+    // Mechanics only: loyalty category and what is needed for the next one
+    loyaltyCategory?: { category: string | null; points?: number; activeMonths?: number; period?: string } | null;
+    loyaltyGuide?: MechanicCategoryGuide;
+}
+
+export interface MechanicCategoryGuide {
+    current: string | null;
+    next: string | null;
+    points: number;
+    activeMonths: number;
+    activeQuarters: number;
+    period: string;
+    requirements: Array<{ type: 'firstScan' | 'points' | 'everyMonth' | 'everyQuarter'; target?: number; needed?: number; done?: number }>;
 }
 
 export interface GetMobileExistInterface {

@@ -60,6 +60,11 @@ import FastImage from 'react-native-fast-image';
 import LinearGradient from 'react-native-linear-gradient';
 import { TAB_BAR_SPACE } from '../../../navigation/CustomTabBar';
 import ShineOverlay from '../../comman/ShineOverlay';
+import MechanicCategory from '../../comman/MechanicCategory/MechanicCategory';
+
+// "gajendra test shop" -> "Gajendra Test Shop"; other letters are kept, so "SK auto" stays "SK Auto"
+const capitalizeWords = (text?: string) =>
+  (text || '').replace(/(^|\s)(\S)/g, (match, space, letter) => space + letter.toUpperCase());
 
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -410,7 +415,7 @@ const Home = (props: any) => {
           <View style={{ flex: 1, paddingRight: 12 }}>
             <Text style={homeStyles.greetingHello}>Welcome back 👋</Text>
             <Text style={homeStyles.greetingName} numberOfLines={1}>
-              {profileData?.firmName}
+              {capitalizeWords(profileData?.firmName)}
             </Text>
             <Text style={homeStyles.greetingTagline}>{t('home.tagline')}</Text>
           </View>
@@ -427,6 +432,13 @@ const Home = (props: any) => {
             )}
           </Pressable>
         </View>
+
+        {/* Mechanic milestone (full width) */}
+        {profileData?.customerType === 'Mechanic' ? (
+          <View style={{ marginHorizontal: 16 }}>
+            <MechanicCategory guide={profileData?.loyaltyGuide} />
+          </View>
+        ) : null}
 
         {/* Points */}
         <LinearGradient
