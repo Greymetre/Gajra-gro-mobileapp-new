@@ -192,7 +192,7 @@ const OTPComponent = (props: any) => {
         // formik.setFieldValue('isClicked', false);
         console.log('Login Response >>>>  ', error);
         setshowError(true);
-        setErrMessageRes(error.message);
+        setErrMessageRes(error?.response?.data?.message || error.message);
       });
   };
   const [showOTPCodeBox, setShowOTPCodeBox] = useState(false);
@@ -282,7 +282,7 @@ const OTPComponent = (props: any) => {
       })
       .catch(error => {
         console.log('Login Response >>>>  ', error);
-        setErrMessageRes(error.message);
+        setErrMessageRes(error?.response?.data?.message || error.message);
         setshowError(true);
         console.log(errMessageRes);
       });
