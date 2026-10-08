@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, StatusBar, Image, ScrollView, Pressable, Alert, Animated, Easing } from 'react-native'
+import { View, Text, StyleSheet, StatusBar, Image, ScrollView, Pressable, Animated, Easing } from 'react-native'
 import React, { useEffect, useRef } from 'react'
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
@@ -73,48 +73,41 @@ const StartingScreen = ({ navigation }: any) => {
     transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [distance, 0] }) }],
   });
 
-  // These features are paused for now: tapping shows "Coming soon" instead of
-  // opening the web view. To re-enable, swap `onPress` back to the commented
-  // `open` handler on each item.
   const explore = [
     {
       key: 'catalogue',
       title: 'e-Catalogue',
       image: require('../../../assets/images/catalog.png'),
       tint: '#E8F0FF',
-      // open: () =>
-      //   navigation.navigate('CatalogueWebViewScreen', {
-      //     url: 'https://gajra.greyninja.in',
-      //     title: 'e-CATALOGUE',
-      //   }),
+      open: () =>
+        navigation.navigate('CatalogueWebViewScreen', {
+          url: 'https://gajra.greyninja.in',
+          title: 'e-CATALOGUE',
+        }),
     },
     {
       key: 'retailer',
       title: 'Retailer Locator',
       image: require('../../../assets/images/locator.png'),
       tint: '#FDECEA',
-      // open: () =>
-      //   navigation.navigate('CatalogueWebViewScreen', {
-      //     url: `${LOCATOR_BASE_URL}/customer-details/Retailer?status=true`,
-      //     title: 'Distributor/Retailer Locator',
-      //   }),
+      open: () =>
+        navigation.navigate('CatalogueWebViewScreen', {
+          url: `${LOCATOR_BASE_URL}/customer-details/Retailer?status=true`,
+          title: 'Distributor/Retailer Locator',
+        }),
     },
     {
       key: 'mechanic',
       title: 'Mechanic Locator',
       image: require('../../../assets/images/mechanic.png'),
       tint: '#E4F6EC',
-      // open: () =>
-      //   navigation.navigate('CatalogueWebViewScreen', {
-      //     url: `${LOCATOR_BASE_URL}/customer-details/Mechanic?mechanicStatus=true`,
-      //     title: 'Mechanic / Fleet / Owner Locator',
-      //   }),
+      open: () =>
+        navigation.navigate('CatalogueWebViewScreen', {
+          url: `${LOCATOR_BASE_URL}/customer-details/Mechanic?mechanicStatus=true`,
+          title: 'Mechanic / Fleet / Owner Locator',
+        }),
     },
   ];
-
-  const showComingSoon = (title: string) => {
-    Alert.alert('Coming Soon', `${title} will be available soon. Stay tuned!`);
-  };
 
   return (
     <View style={styles.screen}>
@@ -204,20 +197,16 @@ const StartingScreen = ({ navigation }: any) => {
           </Pressable>
           </Animated.View>
 
-          {/* Explore (coming soon) */}
+          {/* Explore */}
           <Animated.View style={rise(enter[2])}>
           <View style={styles.exploreHeader}>
             <Text style={styles.sectionLabel}>EXPLORE</Text>
-            <View style={styles.soonPill}>
-              <Ionicons name="time-outline" size={11} color="#B7791F" />
-              <Text style={styles.soonPillText}>Coming Soon</Text>
-            </View>
           </View>
           <View style={styles.exploreRow}>
             {explore.map(item => (
               <Pressable
                 key={item.key}
-                onPress={() => showComingSoon(item.title)}
+                onPress={item.open}
                 style={({ pressed }) => [styles.exploreTile, pressed && styles.pressed]}>
                 <View style={[styles.exploreImageWrap, { backgroundColor: item.tint }]}>
                   <Image source={item.image} style={styles.exploreImage} resizeMode="contain" />
@@ -225,9 +214,6 @@ const StartingScreen = ({ navigation }: any) => {
                 <Text style={styles.exploreTitle} numberOfLines={2}>
                   {item.title}
                 </Text>
-                <View style={styles.soonTag}>
-                  <Text style={styles.soonTagText}>Soon</Text>
-                </View>
               </Pressable>
             ))}
           </View>

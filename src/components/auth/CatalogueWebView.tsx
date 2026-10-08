@@ -7,6 +7,8 @@ import {
     StatusBar,
     BackHandler,
     PermissionsAndroid,
+    ActivityIndicator,
+    Image,
 } from 'react-native';
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -25,11 +27,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 
+import appTheme from '../../utils/appTheme';
+
 const CatalogueWebView = ({ navigation, route }: any) => {
 
     const webViewRef = useRef<any>(null);
 
     const [canGoBack, setCanGoBack] = useState(false);
+    // Cover the blank WebView with a loader until the first page has painted.
+    const [isLoading, setIsLoading] = useState(true);
     const { isFocused }: any = useIsFocused()
 
     useFocusEffect(
@@ -141,6 +147,7 @@ const CatalogueWebView = ({ navigation, route }: any) => {
 
             />
 
+            <View style={styles.container}>
             <WebView
                 ref={webViewRef}
 
@@ -168,7 +175,21 @@ const CatalogueWebView = ({ navigation, route }: any) => {
                 onNavigationStateChange={(navState) => {
                     setCanGoBack(navState.canGoBack);
                 }}
+
+                onLoadEnd={() => setIsLoading(false)}
             />
+
+            {isLoading && (
+                <View style={styles.loader}>
+                    <Image
+                        source={require('../../../assets/images/logo.png')}
+                        style={styles.loaderLogo}
+                        resizeMode="contain"
+                    />
+                    <ActivityIndicator size="large" color={appTheme.NEW_PALLET} />
+                </View>
+            )}
+            </View>
 
         </SafeAreaView>
     );
@@ -177,6 +198,17 @@ const CatalogueWebView = ({ navigation, route }: any) => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+    },
+    loader: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'white',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    loaderLogo: {
+        width: 120,
+        height: 120,
+        marginBottom: 20,
     },
 });
 

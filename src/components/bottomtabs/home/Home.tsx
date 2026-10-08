@@ -10,7 +10,6 @@ import {
   BackHandler,
   Platform,
   StyleSheet,
-  Alert,
 } from 'react-native';
 import React, { useCallback, useEffect, useState } from 'react';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
@@ -588,10 +587,13 @@ const Home = (props: any) => {
           ))}
         </View>
 
-        {/* e-Catalogue (coming soon — webview paused for now) */}
+        {/* e-Catalogue */}
         <Pressable
           onPress={() =>
-            Alert.alert('Coming Soon', 'e-Catalogue will be available soon. Stay tuned!')
+            navigation.navigate('CatalogueWebView', {
+              url: 'https://gajra.greyninja.in',
+              title: 'e-CATALOGUE',
+            })
           }
           style={({ pressed }) => [homeStyles.catalogueWrap, pressed && homeStyles.pressed]}>
           <LinearGradient
@@ -606,15 +608,11 @@ const Home = (props: any) => {
             <View style={{ flex: 1, marginLeft: 14 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <Text style={homeStyles.catalogueTitle}>e-Catalogue</Text>
-                <View style={homeStyles.soonPill}>
-                  <Ionicons name="time-outline" size={10} color="#B7791F" />
-                  <Text style={homeStyles.soonPillText}>Coming Soon</Text>
-                </View>
               </View>
               <Text style={homeStyles.catalogueSubtitle}>Browse our complete product range</Text>
             </View>
             <View style={homeStyles.catalogueCta}>
-              <Ionicons name="lock-closed" size={16} color={appTheme.DARK_BOTTOMTAB} />
+              <Ionicons name="arrow-forward" size={16} color={appTheme.DARK_BOTTOMTAB} />
             </View>
           </LinearGradient>
         </Pressable>
