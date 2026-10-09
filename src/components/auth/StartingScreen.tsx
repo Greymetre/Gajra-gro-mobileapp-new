@@ -87,7 +87,7 @@ const StartingScreen = ({ navigation }: any) => {
     },
     {
       key: 'retailer',
-      title: 'Retailer Locator',
+      title: 'Distributor / Retailer Locator',
       image: require('../../../assets/images/locator.png'),
       tint: '#FDECEA',
       open: () =>
@@ -211,7 +211,7 @@ const StartingScreen = ({ navigation }: any) => {
                 <View style={[styles.exploreImageWrap, { backgroundColor: item.tint }]}>
                   <Image source={item.image} style={styles.exploreImage} resizeMode="contain" />
                 </View>
-                <Text style={styles.exploreTitle} numberOfLines={2}>
+                <Text style={styles.exploreTitle} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.85}>
                   {item.title}
                 </Text>
               </Pressable>

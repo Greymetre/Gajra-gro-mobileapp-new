@@ -69,6 +69,36 @@ const capitalizeWords = (text?: string) =>
 const { width: screenWidth } = Dimensions.get('window');
 
 /** "6.5", "6.5.0" and " 6.5 " are the same version; "6.5" and "6.50" are not. */
+// Locator pages are served by the Railway-hosted landing site (same as StartingScreen).
+const LOCATOR_BASE_URL = 'https://gajragrolandingwebsite-production.up.railway.app';
+
+const exploreLinks = [
+  {
+    key: 'catalogue',
+    title: 'e-Catalogue',
+    subtitle: 'Browse our complete product range',
+    icon: 'albums-outline',
+    url: 'https://gajra.greyninja.in',
+    headerTitle: 'e-CATALOGUE',
+  },
+  {
+    key: 'retailer',
+    title: 'Distributor / Retailer Locator',
+    subtitle: 'Find a distributor or retailer near you',
+    icon: 'storefront-outline',
+    url: `${LOCATOR_BASE_URL}/customer-details/Retailer?status=true`,
+    headerTitle: 'Distributor/Retailer Locator',
+  },
+  {
+    key: 'mechanic',
+    title: 'Mechanic Locator',
+    subtitle: 'Find mechanics, fleets & owners nearby',
+    icon: 'construct-outline',
+    url: `${LOCATOR_BASE_URL}/customer-details/Mechanic?mechanicStatus=true`,
+    headerTitle: 'Mechanic / Fleet / Owner Locator',
+  },
+];
+
 const isSameVersion = (a: any, b: any) => {
   const parts = (v: any) =>
     `${v ?? ''}`.trim().split('.').map(n => parseInt(n, 10) || 0);
@@ -587,35 +617,33 @@ const Home = (props: any) => {
           ))}
         </View>
 
-        {/* e-Catalogue */}
-        <Pressable
-          onPress={() =>
-            navigation.navigate('CatalogueWebView', {
-              url: 'https://gajra.greyninja.in',
-              title: 'e-CATALOGUE',
-            })
-          }
-          style={({ pressed }) => [homeStyles.catalogueWrap, pressed && homeStyles.pressed]}>
-          <LinearGradient
-            colors={['#2B2829', appTheme.DARK_BOTTOMTAB, '#4A4344']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={homeStyles.catalogueCard}>
-            <View style={homeStyles.catalogueDecor} />
-            <View style={homeStyles.catalogueIcon}>
-              <Ionicons name="albums-outline" size={24} color={appTheme.DARK_BOTTOMTAB} />
-            </View>
-            <View style={{ flex: 1, marginLeft: 14 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Text style={homeStyles.catalogueTitle}>e-Catalogue</Text>
+        {/* e-Catalogue & locators */}
+        {exploreLinks.map(link => (
+          <Pressable
+            key={link.key}
+            onPress={() =>
+              navigation.navigate('CatalogueWebView', { url: link.url, title: link.headerTitle })
+            }
+            style={({ pressed }) => [homeStyles.catalogueWrap, pressed && homeStyles.pressed]}>
+            <LinearGradient
+              colors={['#2B2829', appTheme.DARK_BOTTOMTAB, '#4A4344']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={homeStyles.catalogueCard}>
+              <View style={homeStyles.catalogueDecor} />
+              <View style={homeStyles.catalogueIcon}>
+                <Ionicons name={link.icon} size={24} color={appTheme.DARK_BOTTOMTAB} />
               </View>
-              <Text style={homeStyles.catalogueSubtitle}>Browse our complete product range</Text>
-            </View>
-            <View style={homeStyles.catalogueCta}>
-              <Ionicons name="arrow-forward" size={16} color={appTheme.DARK_BOTTOMTAB} />
-            </View>
-          </LinearGradient>
-        </Pressable>
+              <View style={{ flex: 1, marginLeft: 14 }}>
+                <Text style={homeStyles.catalogueTitle} numberOfLines={1}>{link.title}</Text>
+                <Text style={homeStyles.catalogueSubtitle} numberOfLines={1}>{link.subtitle}</Text>
+              </View>
+              <View style={homeStyles.catalogueCta}>
+                <Ionicons name="arrow-forward" size={16} color={appTheme.DARK_BOTTOMTAB} />
+              </View>
+            </LinearGradient>
+          </Pressable>
+        ))}
 
         {/* Room for the floating tab bar */}
         <View style={{ height: TAB_BAR_SPACE }} />
@@ -935,6 +963,7 @@ const homeStyles = StyleSheet.create({
   },
   catalogueWrap: {
     marginHorizontal: 16,
+    marginBottom: 12,
     borderRadius: 18,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 6 },
