@@ -81,7 +81,7 @@ const StartingScreen = ({ navigation }: any) => {
       tint: '#E8F0FF',
       open: () =>
         navigation.navigate('CatalogueWebViewScreen', {
-          url: 'https://gajra.greyninja.in',
+          url: LOCATOR_BASE_URL,
           title: 'e-CATALOGUE',
         }),
     },

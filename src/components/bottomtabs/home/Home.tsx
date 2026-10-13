@@ -78,7 +78,7 @@ const exploreLinks = [
     title: 'e-Catalogue',
     subtitle: 'Browse our complete product range',
     icon: 'albums-outline',
-    url: 'https://gajra.greyninja.in',
+    url: LOCATOR_BASE_URL,
     headerTitle: 'e-CATALOGUE',
   },
   {

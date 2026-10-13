@@ -9,6 +9,7 @@ import {
     PermissionsAndroid,
     ActivityIndicator,
     Image,
+    Text,
 } from 'react-native';
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -36,6 +37,8 @@ const CatalogueWebView = ({ navigation, route }: any) => {
     const [canGoBack, setCanGoBack] = useState(false);
     // Cover the blank WebView with a loader until the first page has painted.
     const [isLoading, setIsLoading] = useState(true);
+    // Shown instead of a blank white page when the site fails to load.
+    const [hasError, setHasError] = useState(false);
     const { isFocused }: any = useIsFocused()
 
     useFocusEffect(
@@ -152,7 +155,7 @@ const CatalogueWebView = ({ navigation, route }: any) => {
                 ref={webViewRef}
 
                 source={{
-                    uri: route?.params?.url || "https://gajra.greyninja.in/"
+                    uri: route?.params?.url || "https://gajragrolandingwebsite-production.up.railway.app/"
                 }}
 
                 javaScriptEnabled
@@ -176,8 +179,30 @@ const CatalogueWebView = ({ navigation, route }: any) => {
                     setCanGoBack(navState.canGoBack);
                 }}
 
+                onLoadStart={() => setHasError(false)}
                 onLoadEnd={() => setIsLoading(false)}
+                onError={() => setHasError(true)}
+                onHttpError={() => setHasError(true)}
+                // iOS kills the web content process under memory pressure, leaving a white page
+                onContentProcessDidTerminate={() => webViewRef.current?.reload()}
             />
+
+            {hasError && (
+                <View style={styles.loader}>
+                    <Ionicons name="cloud-offline-outline" size={48} color={'gray'} />
+                    <Text style={styles.errorText}>Unable to load the page</Text>
+                    <TouchableOpacity
+                        style={styles.retryButton}
+                        onPress={() => {
+                            setHasError(false);
+                            setIsLoading(true);
+                            webViewRef.current?.reload();
+                        }}
+                    >
+                        <Text style={styles.retryText}>Retry</Text>
+                    </TouchableOpacity>
+                </View>
+            )}
 
             {isLoading && (
                 <View style={styles.loader}>
@@ -209,6 +234,22 @@ const styles = StyleSheet.create({
         width: 120,
         height: 120,
         marginBottom: 20,
+    },
+    errorText: {
+        marginTop: 12,
+        fontSize: 15,
+        color: 'black',
+    },
+    retryButton: {
+        marginTop: 16,
+        paddingHorizontal: 24,
+        paddingVertical: 10,
+        borderRadius: 8,
+        backgroundColor: appTheme.NEW_PALLET,
+    },
+    retryText: {
+        color: 'white',
+        fontSize: 15,
     },
 });
 

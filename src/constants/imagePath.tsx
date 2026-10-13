@@ -1,9 +1,7 @@
 export default {
   // IMAGE_URL: 'http://43.204.142.108:4000/',
-  // Images moved from S3 to Cloudflare R2; new uploads return 403 on the old S3 URL.
-  // IMAGE_URL: 'https://s3.ap-south-1.amazonaws.com/gajragro2.fieldkonnect.io/',
+  // Images are served from Cloudflare R2 (custom domain).
   IMAGE_URL: 'https://gajragro.fieldkonnect.io/',
-  // IMAGE_URL: 'https://s3.ap-south-1.amazonaws.com/gajragro.fieldkonnect.io/',
   // IMAGE_URL: 'https://apis.fieldkonnect.io/',
   // IMAGE_URL_TEST: 'http://13.232.29.75:4000/',
   // IMAGE_URL: 'http://13.232.29.75:4000/',
